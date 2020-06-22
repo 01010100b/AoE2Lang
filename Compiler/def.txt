@@ -1,0 +1,44 @@
+﻿Available constants:
+
+STACK_POINTER_BASE_ADDR
+
+Available goals:
+
+intr_1, intr_2, ... (as many as needed)
+intr_current_stack_frame
+
+Intrinsics:
+
+memcpy(int addr1, int addr2, int length):
+
+(defrule
+	(true)
+=>
+	(up-modify-goal intr_1 c:= 0)
+)
+
+(defrule
+	(true)
+=>
+	(up-modify-goal intr_3 g:= addr1)
+	(up-modify-goal intr_3 g:+ intr_1)
+	(up-get-indirect-goal intr_3 intr_2)
+	(up-modify-goal intr_3 g:= addr2)
+	(up-modify-goal intr_3 g:+ intr_1)
+	(up-set-indirect-goal intr_3 intr_2)
+	(up-modify-goal intr_1 c:+ 1)
+)
+
+(defrule
+	(up-compare-goal intr_1 g:< length)
+=>
+	(up-jump-dynamic c:- 2)
+)
+
+get_address(int frame_delta, int frame_offset, int index): int addr
+
+(defrule
+	(true)
+=>
+	(up-modify-goal intr_1 c:= STACK_POINTER_BASE_ADDR)
+	(up-modify-goal intr_1 )
