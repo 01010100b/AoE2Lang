@@ -7,7 +7,7 @@ Available goals:
 reg_1, reg_2, ... (as many as needed)
 reg_current_stack_frame
 
-reginsics:
+intrinsics:
 
 memcpy(int addr1, int addr2, int length):
 
@@ -35,10 +35,85 @@ memcpy(int addr1, int addr2, int length):
 	(up-jump-dynamic c:- 2)
 )
 
-get_address(int frame_delta, int frame_offset, int index): int addr
+sort(int addr, int length, func S):
 
 (defrule
 	(true)
 =>
-	(up-modify-goal reg_1 c:= STACK_POINTER_BASE_ADDR)
-	(up-modify-goal reg_1 )
+	(up-modify-goal is_sorted c:= TRUE)
+	(up-modify-goal index c:= 0)
+)
+
+(defrule
+	(true)
+=>
+	(up-modify-goal current g:= addr)
+	(up-modify-goal current g:+ index)
+	(up-get-indirect-goal g: current item_a)
+	(up-modify-goal current c:+ 1)
+	(up-get-indirect-goal g: current item_b)
+)
+
+<S> ; a bunch of rules which set the goal cmpr to -1 if item_a < item_b, to 0 if item_a = item_b, or to 1 if item_a > item_b
+
+(defrule
+	(up-compare-goal cmpr c:== 1)
+=>
+	(up-modify-goal current g:= addr)
+	(up-modify-goal current g:+ index)
+	(up-set-indirect-goal g: current g: item_b)
+	(up-modify-goal current c:+ 1)
+	(up-set-indirect-goal g: current g: item_a)
+	(up-modify-goal is_sorted c:= FALSE)
+)
+
+(defrule
+	(true)
+=>
+	(up-modify-goal index c:+ 2)
+)
+
+(defrule
+	(up-compare-goal index g:< length)
+=>
+	(up-modify-goal index c:- 1)
+	(up-jump-dynamic c: -(rules_in_S + 4))
+)
+
+(defrule
+	(up-compare-goal is_sorted c:== FALSE)
+=>
+	(up-jump-dynamic c: -(rules_in_S + 6))
+)
+
+Functions:
+
+; F<int, int, int>
+(defrule
+	(true)
+=> 
+	(up-get-rule-id func-addr-F)
+	(up-modify-goal func-addr-F c:+ 1)
+	(up-jump-dynamic c: rules_in_F)
+)
+
+<F> ; the actual function
+
+(defrule
+	(true)
+=>
+	(up-jump-direct g: return-addr)
+)
+
+Calling it:
+
+(defrule
+	(true)
+=>
+	(up-get-rule-id return-addr)
+	(up-modify-goal return-addr c:+ 1)
+	(up-modify-goal par_1 some-parameter)
+	(up-modify-goal par_2 some-parameter)
+	...
+	(up-jump-direct func-addr-F)
+)
