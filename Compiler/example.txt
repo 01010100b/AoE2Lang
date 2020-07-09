@@ -8,8 +8,6 @@ sdc fddf
 qsdint sss
 
 int get1()
-int get2(int a)
-int get3(int a, int b)
 
 a = _push(b)
 a = _pop()

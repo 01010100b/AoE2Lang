@@ -17,17 +17,17 @@ namespace Compiler.Lang
 
         public class CallStatement : Statement
         {
-            public string ResultName { get; set; }
-            public string FunctionName { get; set; }
-            public List<string> ParameterNames { get; set; }
+            public Variable Result { get; set; }
+            public Function Function { get; set; }
+            public List<Variable> Parameters { get; set; }
 
             public override string ToString()
             {
                 var sb = new StringBuilder();
-                sb.Append(ResultName + " " + FunctionName + " (");
-                foreach (var p in ParameterNames)
+                sb.Append(Result.Name + " " + Function.Name + " (");
+                foreach (var p in Parameters)
                 {
-                    sb.Append(p + ", ");
+                    sb.Append(p.Name + ", ");
                 }
                 sb.Append(")");
 

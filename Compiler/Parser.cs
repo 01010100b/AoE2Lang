@@ -14,12 +14,7 @@ namespace Compiler
     {
         public class ParserException : Exception
         {
-            public readonly int Line;
-
-            public ParserException(int line, string message) : base(message)
-            {
-                Line = line;
-            }
+            public ParserException(string file, int line, string message) : base("Error in file " + file + " at line " + line + ": " + message) { }
         }
 
         public static Regex GetStatementRegex(string pattern)
@@ -27,24 +22,32 @@ namespace Compiler
             return new Regex(@"^\s*" + pattern + @"\s*$");
         }
 
-        private const string NamePattern = @"(\b[_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ]+([0123456789_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ])*)";
+        private readonly Dictionary<string, Types.Type> DefinedTypes = new Dictionary<string, Types.Type>();
+        private readonly Dictionary<string, Function> DefinedFunctions = new Dictionary<string, Function>();
+        private readonly Dictionary<string, Variable> GlobalVariables = new Dictionary<string, Variable>();
+
         private string TypePattern = null;
+        private string NamePattern => @"(\b[_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ]+([0123456789_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ])*)";
         private string VariableDeclarationPattern => @"(?<Type>\b" + TypePattern + @")\s+\b(?<Name>" + NamePattern + ")";
         private string FunctionDeclarationPattern => @"(?<ReturnType>\b" + TypePattern + @")\s+\b(?<Name>" + NamePattern + @")\s*(?<Params>\(.*\))";
         private string FunctionCallPattern => @"(?<Result>\b" + NamePattern + @")\s*=\s*\b(?<Name>" + NamePattern + @")\s*(?<Params>\(.*\))";
-        public Script Parse(string source)
+        
+        public Script Parse(Dictionary<string, string> source_files)
         {
-            if (source == null)
+            DefinedTypes.Clear();
+            DefinedFunctions.Clear();
+            GlobalVariables.Clear();
+
+            // get types
+
+            foreach (var type in Types.BuiltinTypes)
             {
-                throw new Exception("source is null");
+                DefinedTypes.Add(type.Name, type);
             }
 
-            var lines = source.Split('\n').Where(l => l != "\r").ToList();
-            var script = new Script();
-            
-            var types = Types.BuiltinTypes;
             // TODO user-defined types
 
+            var types = DefinedTypes.Values.ToList();
             TypePattern = "(" + types[0].Name;
             for (int i = 1; i < types.Count; i++)
             {
@@ -54,12 +57,29 @@ namespace Compiler
 
             Log.Debug("type regex: " + TypePattern);
 
+            // get definitions
+
+            foreach (var kvp in source_files)
+            {
+                ParseDefinitions(kvp.Key, kvp.Value);
+            }
+
+            // output script
+
+            var script = new Script();
+            script.GlobalVariables.AddRange(GlobalVariables.Values);
+            script.Functions.AddRange(DefinedFunctions.Values);
+
+            return script;
+        }
+
+        private void ParseDefinitions(string file, string source)
+        {
+            var lines = source.Split('\n').Where(l => l != "\r").ToList();
             var variable_regex = GetStatementRegex(VariableDeclarationPattern);
             var function_regex = GetStatementRegex(FunctionDeclarationPattern);
-            var call_regex = GetStatementRegex(FunctionCallPattern);
 
-            var blocks = new Stack<Block>();
-            Block current_block = null;
+            var height = 0;
 
             for (int i = 0; i < lines.Count; i++)
             {
@@ -69,39 +89,36 @@ namespace Compiler
                     continue;
                 }
 
-                if (variable_regex.IsMatch(line))
+                if (variable_regex.IsMatch(line) && height == 0)
                 {
                     var m = variable_regex.Match(line);
                     Log.Debug("decl: " + line);
 
                     var variable = new Variable()
                     {
-                        Type = types.Single(t => t.Name == m.Groups["Type"].Value),
+                        Type = DefinedTypes[m.Groups["Type"].Value],
                         Name = m.Groups["Name"].Value
                     };
 
-                    if (current_block == null)
-                    {
-                        script.GlobalVariables.Add(variable);
-                    }
-                    else
-                    {
-                        current_block.LocalVariables.Add(variable);
-                    }
-                    
+                    GlobalVariables.Add(variable.Name, variable);
+
                 }
                 else if (function_regex.IsMatch(line))
                 {
+                    if (height != 0)
+                    {
+                        throw new ParserException(file, i, "function defined inside other function: " + line);
+                    }
+
                     var m = function_regex.Match(line);
                     Log.Debug("func: " + line);
 
-                    current_block = new Block();
                     var function = new Function()
                     {
-                        ReturnType = types.Single(t => t.Name == m.Groups["ReturnType"].Value),
+                        ReturnType = DefinedTypes[m.Groups["ReturnType"].Value],
                         Name = m.Groups["Name"].Value,
                         Parameters = new List<Variable>(),
-                        Block = current_block
+                        Block = new Block()
                     };
 
                     var pars = m.Groups["Params"].Value.Replace("(", "").Replace(")", "").Split(',');
@@ -112,7 +129,7 @@ namespace Compiler
                             var pm = variable_regex.Match(par);
                             var parameter = new Variable()
                             {
-                                Type = types.Single(t => t.Name == pm.Groups["Type"].Value),
+                                Type = DefinedTypes[pm.Groups["Type"].Value],
                                 Name = pm.Groups["Name"].Value
                             };
 
@@ -120,38 +137,31 @@ namespace Compiler
                         }
                         else
                         {
-                            throw new ParserException(i, "Function parameter error: " + par);
+                            throw new ParserException(file, i, "Function parameter error: " + par);
                         }
                     }
 
-                    script.Functions.Add(function);
+                    DefinedFunctions.Add(function.Name, function);
+
+                    if (line.Contains("{"))
+                    {
+                        height++;
+                    }
                 }
-                else if (call_regex.IsMatch(line))
+                else if (line == "{")
                 {
-                    var m = call_regex.Match(line);
-                    Log.Debug("call: " + line);
-
-                    var call = new CallStatement()
+                    height++;
+                }
+                else if (line == "}")
+                {
+                    if (height == 0)
                     {
-                        ResultName = m.Groups["Result"].Value,
-                        FunctionName = m.Groups["Name"].Value,
-                        ParameterNames = new List<string>()
-                    };
-
-                    var pars = m.Groups["Params"].Value.Replace("(", "").Replace(")", "").Split(',');
-                    foreach (var par in pars.Select(p => p.Trim()).Where(p => p.Length > 0))
-                    {
-                        if (Regex.IsMatch(par, NamePattern))
-                        {
-                            call.ParameterNames.Add(par);
-                        }
+                        throw new ParserException(file, i, "encountered } without current block");
                     }
 
-                    current_block.Elements.Add(call);
+                    height--;
                 }
             }
-
-            return script;
         }
     }
 }

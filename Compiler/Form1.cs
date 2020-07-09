@@ -20,11 +20,14 @@ namespace Compiler
 
         private void ButtonCompile_Click(object sender, EventArgs e)
         {
+            var sources = new Dictionary<string, string>();
+
             var file = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "example.txt");
             var source = File.ReadAllText(file);
+            sources.Add(file, source);
 
             var parser = new Parser();
-            var script = parser.Parse(source);
+            var script = parser.Parse(sources);
             var compiler = new Compiler();
             compiler.Compile(script);
 

@@ -13,8 +13,6 @@ namespace Compiler
 
         public void Compile(Script script)
         {
-            script.Functions.RemoveAll(f => f.Block.Elements.Count == 0);
-
             foreach (var function in script.Functions)
             {
                 CompileBlock(function.Block);
@@ -27,10 +25,10 @@ namespace Compiler
             {
                 if (block.Elements[i] is CallStatement call)
                 {
-                    Log.Debug("intr: " + call.FunctionName);
+                    Log.Debug("intr: " + call.Function.Name);
                     var rules = new List<RuleStatement>();
 
-                    if (INTRINSICS.Contains(call.FunctionName))
+                    if (INTRINSICS.Contains(call.Function.Name))
                     {
                         
                         rules = CompileIntrinsic(call);
@@ -46,20 +44,20 @@ namespace Compiler
 
         private List<RuleStatement> CompileIntrinsic(CallStatement call)
         {
-            if (call.FunctionName == "_push")
+            if (call.Function.Name == "_push")
             {
                 var rule = "(defrule\n\t(true)\n=>";
-                rule += $"\n\t(up-set-indirect-goal g: stack-pointer g: {call.ParameterNames[0]})";
+                rule += $"\n\t(up-set-indirect-goal g: stack-pointer g: {call.Parameters[0].Name})";
                 rule += $"\n\t(up-modify-goal stack-pointer c:+ 1)";
                 rule += "\n)";
 
                 return new List<RuleStatement>() { new RuleStatement() { Rule = rule } };
             }
-            else if (call.FunctionName == "_pop")
+            else if (call.Function.Name == "_pop")
             {
                 var rule = "(defrule\n\t(true)\n=>";
                 rule += $"\n\t(up-modify-goal stack-pointer c:- 1)";
-                rule += $"\n\t(up-get-indirect-goal g: stack-pointer g: {call.ResultName})";
+                rule += $"\n\t(up-get-indirect-goal g: stack-pointer g: {call.Result.Name})";
                 rule += "\n)";
 
                 return new List<RuleStatement>() { new RuleStatement() { Rule = rule } };
