@@ -20,6 +20,11 @@ namespace Compiler
 
         private void ButtonCompile_Click(object sender, EventArgs e)
         {
+            Compile();
+        }
+
+        private void Compile()
+        {
             var sources = new Dictionary<string, string>();
 
             var file = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "example.txt");
@@ -34,7 +39,7 @@ namespace Compiler
             Log.Debug("");
             Log.Debug("--- OUTPUT ---");
             Log.Debug("");
-            
+
             Log.Debug("Global Variables:");
             foreach (var v in script.GlobalVariables)
             {
@@ -52,9 +57,6 @@ namespace Compiler
                     Log.Debug(statement.ToString());
                 }
             }
-
-            
-
         }
     }
 }
