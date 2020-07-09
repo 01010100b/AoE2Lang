@@ -60,6 +60,9 @@
     <Compile Include="Lang\Types.cs" />
     <Compile Include="Lang\Variable.cs" />
     <Compile Include="Log.cs" />
+    <Compile Include="Mods\Effect.cs" />
+    <Compile Include="Mods\EffectCommand.cs" />
+    <Compile Include="Mods\Enums.cs" />
     <Compile Include="Parser.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
