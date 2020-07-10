@@ -27,19 +27,28 @@ namespace Compiler
 
         internal static void Test()
         {
-            Debug.WriteLine((int)Resource.SpiesDiscount);
-            var path = @"C:\Users\Tim\AppData\Roaming\Microsoft Games\Age of Empires ii\Data\Empires2_x1_p1.dat";
-            var dat = new DatFile(path);
-            
+            var file = @"C:\Users\Tim\AppData\Roaming\Microsoft Games\Age of Empires ii\Data\Empires2_x1_p1.dat";
+            var mod = new Mod();
+            mod.Load(file);
+
+            Debug.WriteLine("Mod effects: " + mod.Effects.Count);
+            Debug.WriteLine("Mod techs: " + mod.Technologies.Count);
+            Debug.WriteLine("Mod civs: " + mod.Civilizations.Count);
+
+            foreach (var civ in mod.Civilizations)
+            {
+                Debug.WriteLine(civ.Name + " with " + civ.Technologies.Count + " techs and " + civ.Units.Count + " units");
+            }
+
+            var dat = new DatFile(file);
             for (int i = 0; i < dat.Technologies.Count; i++)
             {
-                var tech = dat.Technologies[i];
-
-                foreach (var effect in tech.Effects)
+                foreach (var effect in dat.Technologies[i].Effects)
                 {
-                    if (effect.Command == 1)
+                    if (effect.Command == 3)
                     {
-                        //Debug.WriteLine("effect: " + i);
+                        Debug.WriteLine("effect: " + i);
+                        return;
                     }
                 }
             }

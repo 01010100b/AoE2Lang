@@ -8,5 +8,12 @@ namespace Compiler.Mods
 {
     class Effect
     {
+        public readonly int Id;
+        public readonly List<EffectCommand> Commands = new List<EffectCommand>();
+
+        public Effect(int id)
+        {
+            Id = id;
+        }
     }
 }
