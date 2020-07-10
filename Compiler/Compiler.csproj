@@ -60,6 +60,7 @@
     <Compile Include="Lang\Types.cs" />
     <Compile Include="Lang\Variable.cs" />
     <Compile Include="Log.cs" />
+    <Compile Include="Mods\BuildOrder.cs" />
     <Compile Include="Mods\Civilization.cs" />
     <Compile Include="Mods\Effect.cs" />
     <Compile Include="Mods\EffectCommand.cs" />

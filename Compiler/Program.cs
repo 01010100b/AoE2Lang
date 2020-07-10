@@ -35,23 +35,12 @@ namespace Compiler
             Debug.WriteLine("Mod techs: " + mod.Technologies.Count);
             Debug.WriteLine("Mod civs: " + mod.Civilizations.Count);
 
-            foreach (var civ in mod.Civilizations)
-            {
-                Debug.WriteLine(civ.Name + " with " + civ.Technologies.Count + " techs and " + civ.Units.Count + " units");
-            }
+            var civ = mod.Civilizations[1];
+            Debug.WriteLine($"{civ.Name} with {civ.Units.Count} units and {civ.Technologies.Count} techs");
 
-            var dat = new DatFile(file);
-            for (int i = 0; i < dat.Technologies.Count; i++)
-            {
-                foreach (var effect in dat.Technologies[i].Effects)
-                {
-                    if (effect.Command == 3)
-                    {
-                        Debug.WriteLine("effect: " + i);
-                        return;
-                    }
-                }
-            }
+            var bo = new BuildOrder(civ, civ.Units.Single(u => u.Id == 530));
+            Debug.WriteLine(bo);
+            
         }
     }
 }
