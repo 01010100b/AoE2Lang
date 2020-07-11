@@ -15,6 +15,10 @@ namespace Compiler.Mods
         public readonly Effect Effect;
         public readonly List<Technology> Prerequisites = new List<Technology>();
         public int MinPrerequisites => Math.Min(RequiredTechCount, Prerequisites.Count);
+        public readonly int FoodCost = 0;
+        public readonly int WoodCost = 0;
+        public readonly int GoldCost = 0;
+        public readonly int StoneCost = 0;
 
         private readonly int RequiredTechCount;
 
@@ -35,6 +39,30 @@ namespace Compiler.Mods
             }
 
             RequiredTechCount = research.RequiredTechCount;
+
+            switch (research.Cost1Type)
+            {
+                case 0: FoodCost = research.Cost1Amount; break;
+                case 1: WoodCost = research.Cost1Amount; break;
+                case 2: StoneCost = research.Cost1Amount; break;
+                case 3: GoldCost = research.Cost1Amount; break;
+            }
+
+            switch (research.Cost2Type)
+            {
+                case 0: FoodCost = research.Cost2Amount; break;
+                case 1: WoodCost = research.Cost2Amount; break;
+                case 2: StoneCost = research.Cost2Amount; break;
+                case 3: GoldCost = research.Cost2Amount; break;
+            }
+
+            switch (research.Cost3Type)
+            {
+                case 0: FoodCost = research.Cost3Amount; break;
+                case 1: WoodCost = research.Cost3Amount; break;
+                case 2: StoneCost = research.Cost3Amount; break;
+                case 3: GoldCost = research.Cost3Amount; break;
+            }
         }
     }
 }

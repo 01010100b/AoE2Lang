@@ -14,6 +14,7 @@ namespace Compiler.Mods
         public readonly List<Technology> Technologies = new List<Technology>();
         public readonly List<Unit> Units = new List<Unit>();
         public readonly List<Civilization> Civilizations = new List<Civilization>();
+        public List<Unit> AvailableUnits => Civilizations.SelectMany(c => c.Units).Distinct().ToList();
 
         public void Load(string file)
         {
