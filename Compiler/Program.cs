@@ -6,6 +6,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using YTY.AocDatLib;
 
@@ -22,57 +23,39 @@ namespace Compiler
             Test();
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(new Form1());
+            //Application.Run(new Form1());
         }
 
         internal static void Test()
         {
             const int CIV = 7;
             const int UNIT = 553;
+            const int TECH = 39;
 
             var file = @"C:\Users\Tim\AppData\Roaming\Microsoft Games\Age of Empires ii\Data\Empires2_x1_p1.dat";
             var mod = new Mod();
             mod.Load(file);
 
-            Debug.WriteLine("Mod effects: " + mod.Effects.Count);
-            Debug.WriteLine("Mod techs: " + mod.Technologies.Count);
-            Debug.WriteLine("Mod units: " + mod.Units.Count);
-            Debug.WriteLine("Mod civs: " + mod.Civilizations.Count);
-            Debug.WriteLine("Mod available units: " + mod.AvailableUnits.Count);
+            Trace.WriteLine("Mod effects: " + mod.Effects.Count);
+            Trace.WriteLine("Mod techs: " + mod.Technologies.Count);
+            Trace.WriteLine("Mod units: " + mod.Units.Count);
+            Trace.WriteLine("Mod civs: " + mod.Civilizations.Count);
+            Trace.WriteLine("Mod available units: " + mod.AvailableUnits.Count);
 
             var civ = mod.Civilizations[CIV];
-            Debug.WriteLine($"{civ.Name} with {civ.Units.Count} units and {civ.Technologies.Count} techs going for unit {UNIT}");
+            var unit = civ.Units.Single(u => u.Id == UNIT);
+            var tech = civ.Technologies.Single(t => t.Id == TECH);
+            Trace.WriteLine(civ + $" going for unit {UNIT}");
 
             var sw = new Stopwatch();
             sw.Start();
 
-            var unit = civ.Units.Single(u => u.Id == UNIT);
-            var bo = new BuildOrder(civ, unit);
-
-            var rng = new Random();
-            for (int i = 0; i < 200; i++)
-            {
-                int seed = -1;
-                lock (rng)
-                {
-                    seed = rng.Next() ^ rng.Next() ^ rng.Next();
-                }
-
-                var nbo = new BuildOrder(civ, unit, seed);
-
-                lock (rng)
-                {
-                    if (nbo.TotalCost < bo.TotalCost)
-                    {
-                        bo = nbo;
-                    }
-                }
-            }
+            var bo = civ.GetBuildOrder(unit);
 
             sw.Stop();
-            Debug.WriteLine(bo);
+            Trace.WriteLine(bo);
 
-            Debug.WriteLine($"Took {sw.ElapsedMilliseconds} ms");
+            Trace.WriteLine($"Took {sw.ElapsedMilliseconds} ms");
         }
     }
 }

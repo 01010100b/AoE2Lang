@@ -62,6 +62,7 @@
     <Compile Include="Log.cs" />
     <Compile Include="Mods\BuildOrder.cs" />
     <Compile Include="Mods\Civilization.cs" />
+    <Compile Include="Mods\Cost.cs" />
     <Compile Include="Mods\Effect.cs" />
     <Compile Include="Mods\EffectCommand.cs" />
     <Compile Include="Mods\Enums.cs" />

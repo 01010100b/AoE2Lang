@@ -12,14 +12,21 @@ namespace Compiler.Mods
         public readonly string Name;
         public readonly int Type;
         public readonly int ClassId;
-        public Unit BuildLocation { get; internal set; } = null;
-        public readonly Technology TechInitiated;
-        public readonly bool TechRequired;
+        
         public readonly bool Available;
-        public readonly int FoodCost;
-        public readonly int WoodCost;
-        public readonly int GoldCost;
-        public readonly int StoneCost;
+        public readonly bool TechRequired;
+        public readonly Technology TechInitiated;
+
+        public Unit BuildLocation { get; internal set; } = null;
+        public Unit StackUnit { get; internal set; } = null;
+        public Unit HeadUnit { get; internal set; } = null;
+        public Unit TransformUnit { get; internal set; } = null;
+        public Unit PileUnit { get; internal set; } = null;
+
+        private readonly int FoodCost;
+        private readonly int WoodCost;
+        private readonly int GoldCost;
+        private readonly int StoneCost;
 
         public Unit(YTY.AocDatLib.Unit unit, List<Technology> technologies)
         {
@@ -105,7 +112,50 @@ namespace Compiler.Mods
                     case 3: GoldCost = unit.Cost3Amount; break;
                 }
             }
+        }
+
+        public Cost GetCost(Civilization civilization)
+        {
+            return new Cost(FoodCost, WoodCost, GoldCost, StoneCost);
+        }
+
+        public Unit GetBaseUnit(Civilization civilization)
+        {
+            if (Available || TechRequired == false)
+            {
+                return this;
+            }
+
+            var current = this;
+            var found = true;
             
+            while (found)
+            {
+                found = false;
+
+                foreach (var tech in civilization.Technologies.Where(t => t.Effect != null))
+                {
+                    foreach (var command in tech.Effect.Commands)
+                    {
+                        if (command is UpgradeUnitCommand uc)
+                        {
+                            if (uc.ToUnitId == current.Id)
+                            {
+                                current = civilization.Units.Single(u => u.Id == uc.FromUnitId);
+                                found = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (found)
+                    {
+                        break;
+                    }
+                }
+            }
+
+            return current;
         }
     }
 }

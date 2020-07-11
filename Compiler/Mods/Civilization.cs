@@ -23,6 +23,8 @@ namespace Compiler.Mods
         public Technology Age3Tech => Technologies.Single(t => t.Id == (int)Resources[Resource.Age3Tech]);
         public Technology Age4Tech => Technologies.Single(t => t.Id == (int)Resources[Resource.Age4Tech]);
 
+        public List<Unit> TrainableUnits => Units.Where(u => u.BuildLocation != null).ToList();
+
         public Civilization(int id, YTY.AocDatLib.Civilization civilization, Mod mod)
         {
             Id = id;
@@ -104,24 +106,54 @@ namespace Compiler.Mods
                 }
             }
 
-            // set unit build locations
-            foreach (var unit in Units.Where(u => u.Type != 80))
-            {
-                var datunit = civilization.Units.Single(u => u.Id == unit.Id);
-                var loc = datunit.TrainLocationId;
-
-                if (loc > 0)
-                {
-                    unit.BuildLocation = Units.FirstOrDefault(u => u.Id == loc);
-                }
-            }
-
             foreach (var resource in Enum.GetValues(typeof(Resource)).Cast<Resource>())
             {
                 Resources.Add(resource, civilization.Resources[(int)resource]);
             }
         }
 
-        
+        public BuildOrder GetBuildOrder(Unit unit)
+        {
+            var bo = new BuildOrder(this, unit);
+            bo.AddUpgrades();
+
+            var rng = new Random();
+            for (int i = 0; i < 1000; i++)
+            //Parallel.For(0, 1000, i =>
+            {
+                int seed = -1;
+                lock (rng)
+                {
+                    seed = Math.Abs(rng.Next() ^ rng.Next() ^ rng.Next());
+                }
+
+                var nbo = new BuildOrder(this, unit, seed);
+                nbo.AddUpgrades();
+
+                lock (rng)
+                {
+                    if (nbo.Cost.Total < bo.Cost.Total)
+                    {
+                        bo = nbo;
+                    }
+                }
+            }//);
+
+            // sort 
+            bo.Sort(e => e.Research && (e.Technology == Age1Tech || e.Technology == Age2Tech || e.Technology == Age3Tech || e.Technology == Age4Tech));
+            bo.Sort(e => e.Research == false && e.Unit.Type == 80);
+            bo.Sort(e => e.Research && !(e.Technology == Age1Tech || e.Technology == Age2Tech || e.Technology == Age3Tech || e.Technology == Age4Tech));
+            bo.Sort(e => e.Research == false && e.Unit.Type == 80);
+            bo.Sort(e => e.Research == false && e.Unit.Type != 80);
+
+            bo.InsertGatherers();
+
+            return bo;
+        }
+
+        public override string ToString()
+        {
+            return $"{Name} with {Units.Count} units ({TrainableUnits.Count} buildable) and {Technologies.Count} techs";
+        }
     }
 }

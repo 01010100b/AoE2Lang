@@ -9,7 +9,7 @@ namespace Compiler
     {
         public static void Debug(string message)
         {
-            System.Diagnostics.Debug.WriteLine(message);
+            System.Diagnostics.Trace.WriteLine(message);
         }
     }
 }

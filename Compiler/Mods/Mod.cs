@@ -79,13 +79,46 @@ namespace Compiler.Mods
             }
 
             // get units
+            var datunits = new Dictionary<int, YTY.AocDatLib.Unit>();
             var units = new Dictionary<int, Unit>();
             foreach (var unit in dat.Civilizations.SelectMany(c => c.Units))
             {
+                datunits[unit.Id] = unit;
                 units[unit.Id] = new Unit(unit, Technologies);
             }
 
             Units.AddRange(units.Values);
+
+            // set unit build locations
+            foreach (var unit in Units)
+            {
+                var datunit = datunits[unit.Id];
+
+                if (datunit.TrainLocationId > 0 && unit.Type != 80)
+                {
+                    unit.BuildLocation = units[datunit.TrainLocationId];
+                }
+
+                if (datunit.StackUnitId > 0)
+                {
+                    unit.StackUnit = units[datunit.StackUnitId];
+                }
+
+                if (datunit.HeadUnitId > 0)
+                {
+                    unit.HeadUnit = units[datunit.HeadUnitId];
+                }
+
+                if (datunit.TransformUnitId > 0)
+                {
+                    unit.TransformUnit = units[datunit.TransformUnitId];
+                }
+
+                if (datunit.PileUnit > 0)
+                {
+                    unit.PileUnit = units[datunit.PileUnit];
+                }
+            }
 
             // get civs & units
 
@@ -94,8 +127,6 @@ namespace Compiler.Mods
                 var civ = new Civilization(id, dat.Civilizations[id], this);
                 Civilizations.Add(civ);
             }
-
-            
 
             // assign units to techs
             foreach (var tech in Technologies)

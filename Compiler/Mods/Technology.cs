@@ -15,10 +15,11 @@ namespace Compiler.Mods
         public readonly Effect Effect;
         public readonly List<Technology> Prerequisites = new List<Technology>();
         public int MinPrerequisites => Math.Min(RequiredTechCount, Prerequisites.Count);
-        public readonly int FoodCost = 0;
-        public readonly int WoodCost = 0;
-        public readonly int GoldCost = 0;
-        public readonly int StoneCost = 0;
+
+        private readonly int FoodCost = 0;
+        private readonly int WoodCost = 0;
+        private readonly int GoldCost = 0;
+        private readonly int StoneCost = 0;
 
         private readonly int RequiredTechCount;
 
@@ -63,6 +64,11 @@ namespace Compiler.Mods
                 case 2: StoneCost = research.Cost3Amount; break;
                 case 3: GoldCost = research.Cost3Amount; break;
             }
+        }
+
+        public Cost GetCost(Civilization civilization)
+        {
+            return new Cost(FoodCost, WoodCost, GoldCost, StoneCost);
         }
     }
 }

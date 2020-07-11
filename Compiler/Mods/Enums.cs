@@ -45,7 +45,7 @@ namespace Compiler.Mods
 
     public enum Resource
     {
-        Food,
+        Food = 0,
         Wood,
         Stone,
         Gold,

@@ -3,6 +3,7 @@ using System.CodeDom;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -10,17 +11,19 @@ namespace Compiler.Mods
 {
     class BuildOrder
     {
-        public class BuildElement
+        public struct BuildElement
         {
             public readonly bool Research;
             public readonly Unit Unit;
             public readonly Technology Technology;
 
             public readonly bool Gatherers;
-            public readonly int Food;
-            public readonly int Wood;
-            public readonly int Gold;
-            public readonly int Stone;
+            public readonly int FoodGatherers;
+            public readonly int WoodGatherers;
+            public readonly int GoldGatherers;
+            public readonly int StoneGatherers;
+
+            public bool Buildable => !(Research && Technology.ResearchLocation == null);
 
             public BuildElement(bool research, Unit unit, Technology technology)
             {
@@ -28,64 +31,29 @@ namespace Compiler.Mods
                 Unit = unit;
                 Technology = technology;
                 Gatherers = false;
-
-                if (research)
-                {
-                    Food = technology.FoodCost;
-                    Wood = technology.WoodCost;
-                    Gold = technology.GoldCost;
-                    Stone = technology.StoneCost;
-                }
-                else
-                {
-                    Food = unit.FoodCost;
-                    Wood = unit.WoodCost;
-                    Gold = unit.GoldCost;
-                    Stone = unit.StoneCost;
-                }
+                FoodGatherers = 0;
+                WoodGatherers = 0;
+                GoldGatherers = 0;
+                StoneGatherers = 0;
             }
 
             public BuildElement(int food, int wood, int gold, int stone)
             {
+                Research = false;
+                Unit = null;
+                Technology = null;
                 Gatherers = true;
-                Food = food;
-                Wood = wood;
-                Gold = gold;
-                Stone = stone;
-            }
-
-            public override bool Equals(object obj)
-            {
-                if (obj is BuildElement other)
-                {
-                    return (Research == other.Research) && (Unit == other.Unit) && (Technology == other.Technology);
-                }
-                else
-                {
-                    return false;
-                }
-            }
-
-            public override int GetHashCode()
-            {
-                var hash = Research.GetHashCode();
-                if (Unit != null)
-                {
-                    hash ^= Unit.GetHashCode();
-                }
-                if (Technology != null)
-                {
-                    hash ^= Technology.GetHashCode();
-                }
-
-                return hash;
+                FoodGatherers = food;
+                WoodGatherers = wood;
+                GoldGatherers = gold;
+                StoneGatherers = stone;
             }
 
             public override string ToString()
             {
                 if (Gatherers)
                 {
-                    return $"Set gatherers {Food} {Wood} {Gold} {Stone}";
+                    return $"Set gatherers {FoodGatherers} {WoodGatherers} {GoldGatherers} {StoneGatherers}";
                 }
                 else
                 {
@@ -106,22 +74,48 @@ namespace Compiler.Mods
                     }
                 }
             }
+
+            public override bool Equals(object obj)
+            {
+                if (obj is BuildElement other)
+                {
+                    return (Research == other.Research) && (Unit == other.Unit) && (Technology == other.Technology)
+                        && (Gatherers == other.Gatherers) && (FoodGatherers == other.FoodGatherers)
+                        && (WoodGatherers == other.WoodGatherers) && (GoldGatherers == other.GoldGatherers)
+                        && (StoneGatherers == other.StoneGatherers);
+                }
+                else
+                {
+                    return false;
+                }
+            }
+
+            public override int GetHashCode()
+            {
+                return base.GetHashCode();
+            }
+
+            public static bool operator ==(BuildElement a, BuildElement b)
+            {
+                return a.Equals(b);
+            }
+
+            public static bool operator !=(BuildElement a, BuildElement b)
+            {
+                return !a.Equals(b);
+            }
         }
 
         public readonly Civilization Civilization;
         public readonly Unit Unit;
         public readonly List<BuildElement> Elements;
-
-        public int FoodCost => Elements.Where(e => !e.Gatherers).Sum(e => e.Food);
-        public int WoodCost => Elements.Where(e => !e.Gatherers).Sum(e => e.Wood);
-        public int GoldCost => Elements.Where(e => !e.Gatherers).Sum(e => e.Gold);
-        public int StoneCost => Elements.Where(e => !e.Gatherers).Sum(e => e.Stone);
-        public int TotalCost => FoodCost + WoodCost + GoldCost + StoneCost;
+        public Cost Cost => GetCost();
 
         private readonly HashSet<Unit> SearchingUnits;
         private readonly HashSet<Technology> SearchingTechs;
         private readonly Dictionary<Unit, List<BuildElement>> KnownUnits;
         private readonly Dictionary<Technology, List<BuildElement>> KnownTechnologies;
+        private readonly HashSet<Technology> UnitStateTechnologies;
 
         private readonly Random Random;
 
@@ -140,30 +134,23 @@ namespace Compiler.Mods
             SearchingTechs = new HashSet<Technology>();
             KnownUnits = new Dictionary<Unit, List<BuildElement>>();
             KnownTechnologies = new Dictionary<Technology, List<BuildElement>>();
+            UnitStateTechnologies = new HashSet<Technology>();
 
-            Elements = GetUnit(unit).Where(e => !(e.Research && e.Technology.ResearchLocation == null)).ToList();
-
+            // get unit state techs
             foreach (var tech in civilization.Technologies.Where(t => t.Effect != null))
             {
                 foreach (var command in tech.Effect.Commands)
                 {
-                    if (command is AttributeModifierCommand ac)
+                    if (command is AttributeModifierCommand || command is EnableDisableUnitCommand || command is UpgradeUnitCommand)
                     {
-                        if (ac.UnitId == unit.Id || ac.ClassId == unit.ClassId)
-                        {
-                            var bo = GetTech(tech);
-                            if (bo != null)
-                            {
-                                Elements.AddRange(bo.Where(e => !(e.Research && e.Technology.ResearchLocation == null)).ToList());
-                            }
-                        }
+                        UnitStateTechnologies.Add(tech);
                     }
                 }
             }
 
-            Elements = Elements.Distinct().ToList();
+            Elements = GetUnit(Unit).Where(e => e.Buildable).ToList();
 
-            InsertGatherers();
+            Clean();
         }
 
         public List<BuildElement> GetTechPartial(Technology tech)
@@ -176,6 +163,198 @@ namespace Compiler.Mods
             return KnownUnits[unit];
         }
 
+        public void AddUpgrades()
+        {
+            // add upgrades
+            foreach (var tech in UnitStateTechnologies)
+            {
+                foreach (var command in tech.Effect.Commands)
+                {
+                    if (command is AttributeModifierCommand ac)
+                    {
+                        if (ac.UnitId == Unit.Id || ac.ClassId == Unit.ClassId)
+                        {
+                            var bo = GetTech(tech);
+                            if (bo != null)
+                            {
+                                Elements.AddRange(bo.Where(e => e.Buildable));
+                            }
+                        }
+                    }
+                }
+            }
+
+            // add unit upgrades
+            var current = Unit;
+            var found = true;
+
+            while (found)
+            {
+                found = false;
+
+                foreach (var tech in UnitStateTechnologies)
+                {
+                    foreach (var command in tech.Effect.Commands)
+                    {
+                        if (command is UpgradeUnitCommand uc)
+                        {
+                            if (uc.FromUnitId == current.Id)
+                            {
+                                current = Civilization.Units.Single(u => u.Id == uc.ToUnitId);
+                                var bo = GetTech(tech);
+                                Elements.AddRange(bo.Where(e => e.Buildable));
+
+                                found = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (found)
+                    {
+                        break;
+                    }
+                }
+            }
+
+            Clean();
+        }
+
+        public void Sort(Func<BuildElement, bool> predicate)
+        {
+            var set = new HashSet<BuildElement>();
+
+            for (int i = 0; i < Elements.Count; i++)
+            {
+                set.Clear();
+                var current = Elements[i];
+
+                if (current.Gatherers)
+                {
+                    continue;
+                }
+
+                if (!predicate(current))
+                {
+                    continue;
+                }
+
+                if (current.Gatherers == false)
+                {
+                    if (current.Research)
+                    {
+                        if (current.Technology.ResearchLocation != null)
+                        {
+                            var bes = KnownTechnologies[current.Technology].Where(e => e.Buildable).ToList();
+                            foreach (var be in bes)
+                            {
+                                set.Add(be);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        var bes = KnownUnits[current.Unit].Where(e => e.Buildable).ToList();
+                        foreach (var be in bes)
+                        {
+                            set.Add(be);
+                        }
+                    }
+
+                    for (int j = 0; j < i; j++)
+                    {
+                        if (set.Count == 0 || (set.Count == 1 && set.First() == current))
+                        {
+                            Elements.RemoveAt(i);
+                            Elements.Insert(j, current);
+                            break;
+                        }
+
+                        set.Remove(Elements[j]);
+                    }
+                }
+            }
+        }
+
+        public void InsertGatherers()
+        {
+            var cost = new Cost();
+
+            var start = 0;
+            for (int i = 0; i < Elements.Count; i++)
+            {
+                var current = Elements[i];
+                if (!current.Gatherers)
+                {
+                    Cost ccost;
+                    if (current.Research)
+                    {
+                        ccost = current.Technology.GetCost(Civilization);
+                    }
+                    else
+                    {
+                        ccost = current.Unit.GetCost(Civilization);
+                    }
+
+                    if (current.Research == false && current.Unit == Unit)
+                    {
+                        ccost *= 20;
+                    }
+
+                    if (current.Research == false && current.Unit == Unit.BuildLocation)
+                    {
+                        ccost *= 3;
+                    }
+
+                    cost += ccost;
+                }
+
+                bool age = false;
+                if (current.Research)
+                {
+                    if (Civilization.Age1Tech == current.Technology)
+                    {
+                        age = true;
+                    }
+                    if (Civilization.Age2Tech == current.Technology)
+                    {
+                        age = true;
+                    }
+                    if (Civilization.Age3Tech == current.Technology)
+                    {
+                        age = true;
+                    }
+                    if (Civilization.Age4Tech == current.Technology)
+                    {
+                        age = true;
+                    }
+                }
+
+                if (i == Elements.Count - 1)
+                {
+                    age = true;
+                }
+
+                if (age)
+                {
+                    var sum = cost.Total;
+                    var gatherers = new BuildElement(100 * cost.Food / sum, 100 * cost.Wood / sum, 100 * cost.Gold / sum, 100 * cost.Stone / sum);
+                    Elements.Insert(start, gatherers);
+
+                    cost = new Cost();
+
+                    start = i + 2;
+                    i = start - 1;
+                }
+            }
+
+            var ucost = Unit.GetCost(Civilization);
+            var s = ucost.Total;
+            var gath = new BuildElement(100 * ucost.Food / s, 100 * ucost.Wood / s, 100 * ucost.Gold / s, 100 * ucost.Stone / s);
+
+            Elements.Add(gath);
+        }
+
         public override string ToString()
         {
             var sb = new StringBuilder();
@@ -185,7 +364,7 @@ namespace Compiler.Mods
                 sb.AppendLine(be.ToString());
             }
 
-            sb.AppendLine($"Total build order cost: {FoodCost} {WoodCost} {GoldCost} {StoneCost}");
+            sb.AppendLine($"Total build order cost: {Cost.Food} {Cost.Wood} {Cost.Gold} {Cost.Stone}");
             return sb.ToString();
         }
 
@@ -237,7 +416,7 @@ namespace Compiler.Mods
             // required tech
             if (unit.TechRequired)
             {
-                foreach (var tech in Civilization.Technologies.Where(t => t.Effect != null))
+                foreach (var tech in UnitStateTechnologies)
                 {
                     foreach (var command in tech.Effect.Commands)
                     {
@@ -322,7 +501,6 @@ namespace Compiler.Mods
             {
                 SearchingTechs.Add(tech);
             }
-            
 
             if (tech.Id == TRACK)
             {
@@ -330,7 +508,7 @@ namespace Compiler.Mods
             }
 
             var bo = new List<BuildElement>();
-            
+
             var prereqs = new List<Technology>();
             foreach (var prereq in tech.Prerequisites)
             {
@@ -428,83 +606,33 @@ namespace Compiler.Mods
             return bo;
         }
 
-        private void InsertGatherers()
+        private Cost GetCost()
         {
-            var food = 0;
-            var wood = 0;
-            var gold = 0;
-            var stone = 0;
+            var cost = new Cost();
 
-            var start = 0;
-            for (int i = 0; i < Elements.Count; i++)
+            foreach (var be in Elements)
             {
-                var current = Elements[i];
-                if (!current.Gatherers)
+                if (!be.Gatherers)
                 {
-                    var mul = 1;
-
-                    if (current.Research == false && current.Unit == Unit)
+                    if (be.Research)
                     {
-                        mul = 20;
+                        cost += be.Technology.GetCost(Civilization);
                     }
-
-                    if (current.Research == false && current.Unit == Unit.BuildLocation)
+                    else
                     {
-                        mul = 3;
+                        cost += be.Unit.GetCost(Civilization);
                     }
-
-                    food += current.Food * mul;
-                    wood += current.Wood * mul;
-                    gold += current.Gold * mul;
-                    stone += current.Stone * mul;
-                }
-
-                bool age = false;
-                if (current.Research)
-                {
-                    if (Civilization.Age1Tech == current.Technology)
-                    {
-                        age = true;
-                    }
-                    if (Civilization.Age2Tech == current.Technology)
-                    {
-                        age = true;
-                    }
-                    if (Civilization.Age3Tech == current.Technology)
-                    {
-                        age = true;
-                    }
-                    if (Civilization.Age4Tech == current.Technology)
-                    {
-                        age = true;
-                    }
-                }
-
-                if (i == Elements.Count - 1)
-                {
-                    age = true;
-                }
-
-                if (age)
-                {
-                    var sum = food + wood + gold + stone;
-                    var gatherers = new BuildElement(100 * food / sum, 100 * wood / sum, 100 * gold / sum, 100 * stone / sum);
-                    Elements.Insert(start, gatherers);
-
-                    food = 0;
-                    wood = 0;
-                    gold = 0;
-                    stone = 0;
-                    
-                    start = i + 2;
-                    i = start - 1;
                 }
             }
 
-            var s = Unit.FoodCost + Unit.WoodCost + Unit.GoldCost + Unit.StoneCost;
-            var gath = new BuildElement(100 * Unit.FoodCost / s, 100 * Unit.WoodCost / s, 100 * Unit.GoldCost / s, 100 * Unit.StoneCost / s);
+            return cost;
+        }
 
-            Elements.Add(gath);
+        private void Clean()
+        {
+            var clean = Elements.Distinct().ToList();
+            Elements.Clear();
+            Elements.AddRange(clean);
         }
     }
 }
