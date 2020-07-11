@@ -15,6 +15,7 @@ namespace Compiler.Mods
         public readonly List<Unit> Units = new List<Unit>();
         public readonly List<Civilization> Civilizations = new List<Civilization>();
         public List<Unit> AvailableUnits => Civilizations.SelectMany(c => c.Units).Distinct().ToList();
+        public List<Unit> TrainableUnits => Civilizations.SelectMany(c => c.TrainableUnits).Distinct().ToList();
 
         public void Load(string file)
         {

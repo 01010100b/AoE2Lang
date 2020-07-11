@@ -118,8 +118,8 @@ namespace Compiler.Mods
             bo.AddUpgrades();
 
             var rng = new Random();
-            for (int i = 0; i < 1000; i++)
-            //Parallel.For(0, 1000, i =>
+            //for (int i = 0; i < 1000; i++)
+            Parallel.For(0, 1000, i =>
             {
                 int seed = -1;
                 lock (rng)
@@ -137,7 +137,7 @@ namespace Compiler.Mods
                         bo = nbo;
                     }
                 }
-            }//);
+            });
 
             // sort 
             bo.Sort(e => e.Research && (e.Technology == Age1Tech || e.Technology == Age2Tech || e.Technology == Age3Tech || e.Technology == Age4Tech));

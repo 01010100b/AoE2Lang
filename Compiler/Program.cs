@@ -41,6 +41,7 @@ namespace Compiler
             Trace.WriteLine("Mod units: " + mod.Units.Count);
             Trace.WriteLine("Mod civs: " + mod.Civilizations.Count);
             Trace.WriteLine("Mod available units: " + mod.AvailableUnits.Count);
+            Trace.WriteLine("Mod trainable units: " + mod.TrainableUnits.Count);
 
             var civ = mod.Civilizations[CIV];
             var unit = civ.Units.Single(u => u.Id == UNIT);
