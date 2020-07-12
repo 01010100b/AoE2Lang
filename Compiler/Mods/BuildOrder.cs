@@ -3,6 +3,7 @@ using System.CodeDom;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Net;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
@@ -260,17 +261,23 @@ namespace Compiler.Mods
                 throw new Exception("can't sort with gatherer commands");
             }
 
-            var set = new HashSet<BuildElement>();
-            for (int i = 0; i < Elements.Count; i++)
+            var sorts = new List<KeyValuePair<BuildElement, double>>();
+            foreach (var be in Elements)
             {
-                var current = Elements[i];
+                sorts.Add(new KeyValuePair<BuildElement, double>(be, GetPriority(be)));
+            }
+
+            var set = new HashSet<BuildElement>();
+            for (int i = 0; i < sorts.Count; i++)
+            {
+                var current = sorts[i];
 
                 set.Clear();
-                if (current.Research)
+                if (current.Key.Research)
                 {
-                    if (current.Technology.ResearchLocation != null)
+                    if (current.Key.Technology.ResearchLocation != null)
                     {
-                        var bes = KnownTechnologies[current.Technology].Where(e => e.Buildable).ToList();
+                        var bes = KnownTechnologies[current.Key.Technology].Where(e => e.Buildable).ToList();
                         foreach (var be in bes)
                         {
                             set.Add(be);
@@ -279,7 +286,7 @@ namespace Compiler.Mods
                 }
                 else
                 {
-                    var bes = KnownUnits[current.Unit].Where(e => e.Buildable).ToList();
+                    var bes = KnownUnits[current.Key.Unit].Where(e => e.Buildable).ToList();
                     foreach (var be in bes)
                     {
                         set.Add(be);
@@ -288,20 +295,23 @@ namespace Compiler.Mods
 
                 for (int j = 0; j < i; j++)
                 {
-                    if (set.Count == 0 || (set.Count == 1 && set.First() == current))
+                    if (set.Count == 0 || (set.Count == 1 && set.First() == current.Key))
                     {
-                        var other = Elements[j];
-                        if (GetPriority(current) > GetPriority(other))
+                        var other = sorts[j];
+                        if (current.Value > other.Value)
                         {
-                            Elements.RemoveAt(i);
-                            Elements.Insert(j, current);
+                            sorts.RemoveAt(i);
+                            sorts.Insert(j, current);
                             break;
                         }
                     }
 
-                    set.Remove(Elements[j]);
+                    set.Remove(sorts[j].Key);
                 }
             }
+
+            Elements.Clear();
+            Elements.AddRange(sorts.Select(s => s.Key));
         }
 
         public void Sort(Func<BuildElement, bool> predicate)
