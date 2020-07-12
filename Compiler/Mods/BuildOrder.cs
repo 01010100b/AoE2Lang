@@ -110,16 +110,18 @@ namespace Compiler.Mods
         public readonly Unit Unit;
         public readonly List<BuildElement> Elements;
         public Cost Cost => GetCost();
+        public double Score => GetScore();
 
         private readonly HashSet<Unit> SearchingUnits;
         private readonly HashSet<Technology> SearchingTechs;
         private readonly Dictionary<Unit, List<BuildElement>> KnownUnits;
         private readonly Dictionary<Technology, List<BuildElement>> KnownTechnologies;
+        private readonly List<Unit> AvailableUnits;
         private readonly HashSet<Technology> UnitStateTechnologies;
 
         private readonly Random Random;
 
-        public BuildOrder(Civilization civilization, Unit unit, int seed = -1)
+        internal BuildOrder(Civilization civilization, Unit unit, bool water = false, int seed = -1)
         {
             Random = new Random();
             if (seed >= 0)
@@ -134,6 +136,7 @@ namespace Compiler.Mods
             SearchingTechs = new HashSet<Technology>();
             KnownUnits = new Dictionary<Unit, List<BuildElement>>();
             KnownTechnologies = new Dictionary<Technology, List<BuildElement>>();
+            AvailableUnits = Civilization.AvailableUnits.Where(u => u.Land).ToList();
             UnitStateTechnologies = new HashSet<Technology>();
 
             // get unit state techs
@@ -200,7 +203,7 @@ namespace Compiler.Mods
                         {
                             if (uc.FromUnitId == current.Id)
                             {
-                                current = Civilization.Units.Single(u => u.Id == uc.ToUnitId);
+                                current = AvailableUnits.Single(u => u.Id == uc.ToUnitId);
                                 var bo = GetTech(tech);
                                 Elements.AddRange(bo.Where(e => e.Buildable));
 
@@ -220,14 +223,105 @@ namespace Compiler.Mods
             Clean();
         }
 
+        public void AddEcoUpgrades()
+        {
+            var vills = Civilization.Units.Where(u => u.ClassId == 4).ToList();
+
+            foreach (var tech in UnitStateTechnologies)
+            {
+                foreach (var command in tech.Effect.Commands)
+                {
+                    if (command is AttributeModifierCommand ac)
+                    {
+                        var unit = vills.FirstOrDefault(u => u.Id == ac.UnitId);
+                        if (unit != null || ac.ClassId == 4)
+                        {
+                            if (ac.Attribute == Attribute.WorkRate || ac.Attribute == Attribute.TrainTime 
+                                || ac.Attribute == Attribute.CarryCapacity)
+                            {
+                                var bo = GetTech(tech);
+                                if (bo != null)
+                                {
+                                    Elements.AddRange(bo.Where(e => e.Buildable));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Clean();
+        }
+
+        public void Sort()
+        {
+            if (Elements.Count(e => e.Gatherers) > 0)
+            {
+                throw new Exception("can't sort with gatherer commands");
+            }
+
+            var set = new HashSet<BuildElement>();
+            for (int i = 0; i < Elements.Count; i++)
+            {
+                var current = Elements[i];
+
+                set.Clear();
+                if (current.Research)
+                {
+                    if (current.Technology.ResearchLocation != null)
+                    {
+                        var bes = KnownTechnologies[current.Technology].Where(e => e.Buildable).ToList();
+                        foreach (var be in bes)
+                        {
+                            set.Add(be);
+                        }
+                    }
+                }
+                else
+                {
+                    var bes = KnownUnits[current.Unit].Where(e => e.Buildable).ToList();
+                    foreach (var be in bes)
+                    {
+                        set.Add(be);
+                    }
+                }
+
+                for (int j = 0; j < i; j++)
+                {
+                    if (set.Count == 0 || (set.Count == 1 && set.First() == current))
+                    {
+                        var other = Elements[j];
+                        if (GetPriority(current) > GetPriority(other))
+                        {
+                            Elements.RemoveAt(i);
+                            Elements.Insert(j, current);
+                            break;
+                        }
+                    }
+
+                    set.Remove(Elements[j]);
+                }
+            }
+        }
+
         public void Sort(Func<BuildElement, bool> predicate)
         {
             var set = new HashSet<BuildElement>();
-
+            var age2 = -1;
             for (int i = 0; i < Elements.Count; i++)
             {
                 set.Clear();
                 var current = Elements[i];
+
+                if (current.Gatherers == false && current.Research == true && current.Technology == Civilization.Age2Tech)
+                {
+                    age2 = i + 1;
+                }
+
+                if (age2 == -1)
+                {
+                    continue;
+                }
 
                 if (current.Gatherers)
                 {
@@ -239,39 +333,44 @@ namespace Compiler.Mods
                     continue;
                 }
 
-                if (current.Gatherers == false)
+                if (current.Research)
                 {
-                    if (current.Research)
+                    if (current.Technology.ResearchLocation != null)
                     {
-                        if (current.Technology.ResearchLocation != null)
-                        {
-                            var bes = KnownTechnologies[current.Technology].Where(e => e.Buildable).ToList();
-                            foreach (var be in bes)
-                            {
-                                set.Add(be);
-                            }
-                        }
-                    }
-                    else
-                    {
-                        var bes = KnownUnits[current.Unit].Where(e => e.Buildable).ToList();
+                        var bes = KnownTechnologies[current.Technology].Where(e => e.Buildable).ToList();
                         foreach (var be in bes)
                         {
                             set.Add(be);
                         }
                     }
-
-                    for (int j = 0; j < i; j++)
+                }
+                else
+                {
+                    var bes = KnownUnits[current.Unit].Where(e => e.Buildable).ToList();
+                    foreach (var be in bes)
                     {
-                        if (set.Count == 0 || (set.Count == 1 && set.First() == current))
-                        {
-                            Elements.RemoveAt(i);
-                            Elements.Insert(j, current);
-                            break;
-                        }
-
-                        set.Remove(Elements[j]);
+                        set.Add(be);
                     }
+                }
+
+                for (int j = 0; j < age2; j++)
+                {
+                    set.Remove(Elements[j]);
+                }
+
+                for (int j = age2; j < i; j++)
+                {
+                    if (set.Count == 0 || (set.Count == 1 && set.First() == current))
+                    {
+                        var other = Elements[i];
+                        
+
+                        Elements.RemoveAt(i);
+                        Elements.Insert(j, current);
+                        break;
+                    }
+
+                    set.Remove(Elements[j]);
                 }
             }
         }
@@ -299,11 +398,11 @@ namespace Compiler.Mods
                     if (current.Research == false && current.Unit == Unit)
                     {
                         ccost *= 20;
-                    }
-
-                    if (current.Research == false && current.Unit == Unit.BuildLocation)
-                    {
-                        ccost *= 3;
+                        
+                        if (Unit.BuildLocation != null)
+                        {
+                            ccost += Unit.BuildLocation.GetCost(Civilization) * 3;
+                        }
                     }
 
                     cost += ccost;
@@ -382,6 +481,11 @@ namespace Compiler.Mods
                 return new List<BuildElement>();
             }
 
+            if (unit.Id == 109)
+            {
+                return new List<BuildElement>();
+            }
+
             if (KnownUnits.ContainsKey(unit))
             {
                 return KnownUnits[unit];
@@ -444,17 +548,13 @@ namespace Compiler.Mods
                                 var b = GetTech(tech);
                                 if (b != null)
                                 {
-                                    var from = Civilization.Units.Single(u => u.Id == uc.FromUnitId);
-                                    var c = GetUnit(from);
-                                    if (c != null)
-                                    {
-                                        bo.AddRange(c);
-                                        bo.AddRange(b);
-                                        SearchingUnits.Remove(unit);
-                                        KnownUnits.Add(unit, bo);
+                                    bo.AddRange(b);
+                                    bo.Add(new BuildElement(false, unit, null));
 
-                                        return bo;
-                                    }
+                                    SearchingUnits.Remove(unit);
+                                    KnownUnits.Add(unit, bo);
+
+                                    return bo;
                                 }
                             }
                         }
@@ -555,7 +655,7 @@ namespace Compiler.Mods
                 }
 
                 List<BuildElement> b = null;
-                foreach (var unit in Civilization.Units.Where(u => u.TechInitiated == tech))
+                foreach (var unit in AvailableUnits.Where(u => u.TechInitiated == tech))
                 {
                     if (tech.Id == TRACK)
                     {
@@ -626,6 +726,88 @@ namespace Compiler.Mods
             }
 
             return cost;
+        }
+
+        private double GetScore()
+        {
+            var cost = GetCost().Total;
+
+
+
+            return 1d / GetCost().Total;
+        }
+
+        private int GetPriority(BuildElement be)
+        {
+            if (be.Gatherers)
+            {
+                return -1;
+            }
+
+            var prior = 0;
+
+            if (be.Research == true && be.Technology.ResourceImproved == Resource.Stone)
+            {
+                prior = 20;
+            }
+
+            if (be.Research == true && be.Technology.ResourceImproved == Resource.Gold)
+            {
+                prior = 30;
+            }
+
+            if (be.Research == true && be.Technology.ResourceImproved == Resource.Food)
+            {
+                prior = 40;
+            }
+
+            if (be.Research == true && be.Technology.ResourceImproved == Resource.Wood)
+            {
+                prior = 50;
+            }
+
+            if (be.Research == false && be.Unit == Unit.BuildLocation)
+            {
+                prior = 55;
+            }
+
+            if (be.Research == false && be.Unit == Civilization.GetDropSite(Resource.Stone))
+            {
+                prior = 60;
+            }
+
+            if (be.Research == false && be.Unit == Civilization.GetDropSite(Resource.Gold))
+            {
+                prior = 70;
+            }
+
+            if (be.Research == false && be.Unit == Civilization.GetDropSite(Resource.Food))
+            {
+                prior = 80;
+            }
+
+            if (be.Research == false && be.Unit == Civilization.GetDropSite(Resource.Wood))
+            {
+                prior = 90;
+            }
+
+            if (be.Research == true && (be.Technology == Civilization.Age1Tech || be.Technology == Civilization.Age2Tech
+                || be.Technology == Civilization.Age3Tech || be.Technology == Civilization.Age4Tech))
+            {
+                prior = 100;
+            }
+
+            if (be.Research == true && be.Technology.Effect.Commands.Count(c => c is UpgradeUnitCommand) > 0)
+            {
+                prior = 200;
+            }
+
+            if (be.Research == false && be.Unit == Unit)
+            {
+                prior = 300;
+            }
+
+            return prior;
         }
 
         private void Clean()

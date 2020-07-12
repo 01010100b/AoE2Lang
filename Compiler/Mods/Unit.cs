@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.AccessControl;
 using System.Text;
 using System.Threading.Tasks;
+using YTY.AocDatLib;
 
 namespace Compiler.Mods
 {
@@ -12,16 +14,34 @@ namespace Compiler.Mods
         public readonly string Name;
         public readonly int Type;
         public readonly int ClassId;
-        
+        public readonly bool Land;
+
         public readonly bool Available;
         public readonly bool TechRequired;
         public readonly Technology TechInitiated;
+        public Resource ResourceGathered => GetResourceGathered();
 
         public Unit BuildLocation { get; internal set; } = null;
+        public Unit UpgradedFrom { get; internal set; } = null;
+        public Unit UpgradesTo { get; internal set; } = null;
+        public Unit BaseUnit { get
+            {
+                var current = this;
+                while (current.UpgradedFrom != null)
+                {
+                    current = current.UpgradedFrom;
+                }
+
+                return current;
+            }
+        }
         public Unit StackUnit { get; internal set; } = null;
         public Unit HeadUnit { get; internal set; } = null;
         public Unit TransformUnit { get; internal set; } = null;
         public Unit PileUnit { get; internal set; } = null;
+        public Unit DropSite { get; internal set; } = null;
+
+        public readonly List<UnitCommand> Commands = new List<UnitCommand>();
 
         private readonly int FoodCost;
         private readonly int WoodCost;
@@ -34,6 +54,16 @@ namespace Compiler.Mods
             Name = new string(Encoding.ASCII.GetChars(unit.Name).Where(c => char.IsLetterOrDigit(c)).ToArray());
             Type = unit.Type;
             ClassId = unit.UnitClass;
+            
+
+            if (unit.TerrainRestriction == 4 || unit.TerrainRestriction == 7)
+            {
+                Land = true;
+            }
+            else
+            {
+                Land = false;
+            }
 
             TechRequired = false;
             Available = false;
@@ -119,43 +149,43 @@ namespace Compiler.Mods
             return new Cost(FoodCost, WoodCost, GoldCost, StoneCost);
         }
 
-        public Unit GetBaseUnit(Civilization civilization)
+        public int GetAge(Civilization civilization)
         {
-            if (Available || TechRequired == false)
+            var bo = new BuildOrder(civilization, this);
+            var age = 1;
+            if (bo.Elements.Count(be => be.Gatherers == false && be.Research == true && be.Technology == civilization.Age2Tech) > 0)
             {
-                return this;
+                age = 2;
+            }
+            if (bo.Elements.Count(be => be.Gatherers == false && be.Research == true && be.Technology == civilization.Age3Tech) > 0)
+            {
+                age = 3;
+            }
+            if (bo.Elements.Count(be => be.Gatherers == false && be.Research == true && be.Technology == civilization.Age4Tech) > 0)
+            {
+                age = 4;
             }
 
-            var current = this;
-            var found = true;
-            
-            while (found)
+            return age;
+        }
+
+        private Resource GetResourceGathered()
+        {
+            var resource = Resource.None;
+            foreach (var command in Commands)
             {
-                found = false;
-
-                foreach (var tech in civilization.Technologies.Where(t => t.Effect != null))
+                if (command.Attr1 != (int)Resource.None)
                 {
-                    foreach (var command in tech.Effect.Commands)
-                    {
-                        if (command is UpgradeUnitCommand uc)
-                        {
-                            if (uc.ToUnitId == current.Id)
-                            {
-                                current = civilization.Units.Single(u => u.Id == uc.FromUnitId);
-                                found = true;
-                                break;
-                            }
-                        }
-                    }
+                    resource = (Resource)command.Attr1;
 
-                    if (found)
+                    if (command.Attr3 != (int)Resource.None)
                     {
-                        break;
+                        resource = (Resource)command.Attr3;
                     }
                 }
             }
 
-            return current;
+            return resource;
         }
     }
 }

@@ -2,10 +2,12 @@
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
+using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Windows.Forms;
 using static Compiler.Lang.Statements;
 
@@ -20,41 +22,56 @@ namespace Compiler
 
         private void ButtonCompile_Click(object sender, EventArgs e)
         {
-            Compile();
+            CompileOld(new Settings());
+            Debug.WriteLine("done");
         }
 
-        private void Compile()
+        private void Compile(Settings settings)
         {
-            var sources = new Dictionary<string, string>();
+            
+        }
 
-            var file = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "example.txt");
-            var source = File.ReadAllText(file);
-            sources.Add(file, source);
-
-            var parser = new Parser();
-            var script = parser.Parse(sources);
-            var compiler = new Compiler();
-            compiler.Compile(script);
-
-            Log.Debug("");
-            Log.Debug("--- OUTPUT ---");
-            Log.Debug("");
-
-            Log.Debug("Global Variables:");
-            foreach (var v in script.GlobalVariables)
+        private void CompileOld(Settings settings)
+        {
+            var script = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Old", "Script");
+            if (Directory.Exists(script))
             {
-                Log.Debug($"{v.Type.Name} {v.Name}");
+                Directory.Delete(script, true);
             }
-            Log.Debug("");
 
-            Log.Debug("Functions:");
-            foreach (var f in script.Functions)
+            CopyFolder(settings.SourceFolder, script);
+
+            var comp = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Old", "Binary.exe");
+            var process = Process.Start(comp);
+            process.WaitForExit();
+
+            script = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Old", "ParsedScript");
+            CopyFolder(script, settings.AiFolder);
+        }
+
+        private void CopyFolder(string from, string to)
+        {
+            if (!Directory.Exists(to))
             {
-                Log.Debug($"{f.ReturnType.Name} {f.Name} with {f.Parameters.Count} parameters and {f.Block.Elements.Count} statements");
+                Directory.CreateDirectory(to);
+            }
 
-                foreach (var statement in f.Block.Elements.Where(s => s is Statement).Cast<Statement>())
+            var queue = new Queue<string>();
+            queue.Enqueue(from);
+
+            while (queue.Count > 0)
+            {
+                var current = queue.Dequeue();
+                var rel = current.Replace(from, "");
+                foreach (var file in Directory.GetFiles(current))
                 {
-                    Log.Debug(statement.ToString());
+                    var outfile = Path.Combine(to + rel, Path.GetFileName(file));
+                    File.Copy(file, outfile, true);
+                }
+
+                foreach (var dir in Directory.GetDirectories(current))
+                {
+                    queue.Enqueue(dir);
                 }
             }
         }

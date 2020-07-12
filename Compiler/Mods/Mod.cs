@@ -14,7 +14,7 @@ namespace Compiler.Mods
         public readonly List<Technology> Technologies = new List<Technology>();
         public readonly List<Unit> Units = new List<Unit>();
         public readonly List<Civilization> Civilizations = new List<Civilization>();
-        public List<Unit> AvailableUnits => Civilizations.SelectMany(c => c.Units).Distinct().ToList();
+        public List<Unit> AvailableUnits => Civilizations.SelectMany(c => c.AvailableUnits).Distinct().ToList();
         public List<Unit> TrainableUnits => Civilizations.SelectMany(c => c.TrainableUnits).Distinct().ToList();
 
         public void Load(string file)
@@ -90,7 +90,41 @@ namespace Compiler.Mods
 
             Units.AddRange(units.Values);
 
-            // set unit build locations
+            // assign units to techs
+            foreach (var tech in Technologies)
+            {
+                var dattech = dat.Researches[tech.Id];
+                if (dattech.ResearchLocation > 0)
+                {
+                    tech.ResearchLocation = units[dattech.ResearchLocation];
+                }
+            }
+
+            Units.Sort((a, b) => a.Id.CompareTo(b.Id));
+            for (int i = 0; i < Units.Count; i++)
+            {
+                Units[i].Commands.AddRange(dat.UnitCommands[i]);
+            }
+
+            var upgrades = Technologies
+                .Where(t => t.Effect != null)
+                .SelectMany(t => t.Effect.Commands)
+                .Where(c => c is UpgradeUnitCommand)
+                .ToList();
+
+            foreach (var uc in upgrades.Cast<UpgradeUnitCommand>())
+            {
+                if (units.TryGetValue(uc.FromUnitId, out Unit from))
+                {
+                    if (units.TryGetValue(uc.ToUnitId, out Unit to))
+                    {
+                        from.UpgradesTo = to;
+                        to.UpgradedFrom = from;
+                    }
+                }
+            }
+
+            // set unit refs
             foreach (var unit in Units)
             {
                 var datunit = datunits[unit.Id];
@@ -119,24 +153,73 @@ namespace Compiler.Mods
                 {
                     unit.PileUnit = units[datunit.PileUnit];
                 }
+
+                if (unit.Land)
+                {
+                    if (units.TryGetValue(datunit.DropSite0, out Unit d0))
+                    {
+                        unit.DropSite = d0;
+                    }
+
+                    if (units.TryGetValue(datunit.DropSite1, out Unit d1))
+                    {
+                        if (unit.DropSite == null)
+                        {
+                            unit.DropSite = d1;
+                        }
+                        else if (d1.GetCost(null).Total < unit.DropSite.GetCost(null).Total)
+                        {
+                            unit.DropSite = d1;
+                        }
+                    }
+                }
             }
 
-            // get civs & units
+            // set tech resource improvements
+            foreach (var tech in Technologies.Where(t => t.Effect != null))
+            {
+                foreach (var command in tech.Effect.Commands)
+                {
+                    if (command is AttributeModifierCommand ac)
+                    {
+                        if (ac.Attribute == Attribute.CarryCapacity)
+                        {
+                            if (ac.ClassId == 4)
+                            {
+                                tech.ResourceImproved = Resource.Food;
+                                break;
+                            }
+                            else if (units.TryGetValue(ac.UnitId, out Unit unit))
+                            {
+                                if (unit.ResourceGathered != Resource.None)
+                                {
+                                    tech.ResourceImproved = unit.ResourceGathered;
+                                    break;
+                                }
+                                
+                            }
+                        }
+                        else if (ac.Attribute == Attribute.WorkRate)
+                        {
+                            if (units.TryGetValue(ac.UnitId, out Unit unit))
+                            {
+                                if (unit.ResourceGathered != Resource.None)
+                                {
+                                    tech.ResourceImproved = unit.ResourceGathered;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // get civs
 
             for (int id = 0; id < dat.Civilizations.Count; id++)
             {
                 var civ = new Civilization(id, dat.Civilizations[id], this);
                 Civilizations.Add(civ);
-            }
-
-            // assign units to techs
-            foreach (var tech in Technologies)
-            {
-                var dattech = dat.Researches[tech.Id];
-                if (dattech.ResearchLocation > 0)
-                {
-                    tech.ResearchLocation = units[dattech.ResearchLocation];
-                }
             }
         }
     }

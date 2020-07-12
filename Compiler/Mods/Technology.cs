@@ -15,6 +15,7 @@ namespace Compiler.Mods
         public readonly Effect Effect;
         public readonly List<Technology> Prerequisites = new List<Technology>();
         public int MinPrerequisites => Math.Min(RequiredTechCount, Prerequisites.Count);
+        public Resource ResourceImproved { get; internal set; } = Resource.None;
 
         private readonly int FoodCost = 0;
         private readonly int WoodCost = 0;

@@ -22,8 +22,8 @@ namespace Compiler.Mods
         public Technology Age2Tech => Technologies.Single(t => t.Id == (int)Resources[Resource.Age2Tech]);
         public Technology Age3Tech => Technologies.Single(t => t.Id == (int)Resources[Resource.Age3Tech]);
         public Technology Age4Tech => Technologies.Single(t => t.Id == (int)Resources[Resource.Age4Tech]);
-
-        public List<Unit> TrainableUnits => Units.Where(u => u.BuildLocation != null).ToList();
+        public List<Unit> AvailableUnits => Units.Where(u => u.Available || u.TechRequired).ToList();
+        public List<Unit> TrainableUnits => AvailableUnits.Where(u => u.BuildLocation != null).ToList();
 
         public Civilization(int id, YTY.AocDatLib.Civilization civilization, Mod mod)
         {
@@ -31,6 +31,7 @@ namespace Compiler.Mods
             Name = new string(Encoding.ASCII.GetChars(civilization.Name).Where(c => char.IsLetterOrDigit(c)).ToArray());
             var effect = mod.Effects[civilization.TechTreeId];
 
+            // techs
             var set = new HashSet<int>();
             foreach (var tech in mod.Technologies.Where(t => t.CivId == id || t.CivId == -1))
             {
@@ -47,11 +48,12 @@ namespace Compiler.Mods
                 Technologies.Add(mod.Technologies[techid]);
             }
 
+            // units
             set.Clear();
 
             foreach (var unit in mod.Units)
             {
-                if (unit.Available)
+                if (unit.TechRequired == false)
                 {
                     set.Add(unit.Id);
                 }
@@ -106,20 +108,21 @@ namespace Compiler.Mods
                 }
             }
 
-            foreach (var resource in Enum.GetValues(typeof(Resource)).Cast<Resource>())
+            foreach (var resource in Enum.GetValues(typeof(Resource)).Cast<Resource>().Where(r => r != Resource.None))
             {
                 Resources.Add(resource, civilization.Resources[(int)resource]);
             }
         }
 
-        public BuildOrder GetBuildOrder(Unit unit)
+        public BuildOrder GetBuildOrder(Unit unit, int iterations = 1000)
         {
             var bo = new BuildOrder(this, unit);
             bo.AddUpgrades();
+            bo.AddEcoUpgrades();
+            bo.Sort();
 
             var rng = new Random();
-            //for (int i = 0; i < 1000; i++)
-            Parallel.For(0, 1000, i =>
+            Parallel.For(0, iterations, i =>
             {
                 int seed = -1;
                 lock (rng)
@@ -127,24 +130,18 @@ namespace Compiler.Mods
                     seed = Math.Abs(rng.Next() ^ rng.Next() ^ rng.Next());
                 }
 
-                var nbo = new BuildOrder(this, unit, seed);
+                var nbo = new BuildOrder(this, unit, false, seed);
                 nbo.AddUpgrades();
-
+                nbo.AddEcoUpgrades();
+                nbo.Sort();
                 lock (rng)
                 {
-                    if (nbo.Cost.Total < bo.Cost.Total)
+                    if (nbo.Score > bo.Score)
                     {
                         bo = nbo;
                     }
                 }
             });
-
-            // sort 
-            bo.Sort(e => e.Research && (e.Technology == Age1Tech || e.Technology == Age2Tech || e.Technology == Age3Tech || e.Technology == Age4Tech));
-            bo.Sort(e => e.Research == false && e.Unit.Type == 80);
-            bo.Sort(e => e.Research && !(e.Technology == Age1Tech || e.Technology == Age2Tech || e.Technology == Age3Tech || e.Technology == Age4Tech));
-            bo.Sort(e => e.Research == false && e.Unit.Type == 80);
-            bo.Sort(e => e.Research == false && e.Unit.Type != 80);
 
             bo.InsertGatherers();
 
@@ -154,6 +151,19 @@ namespace Compiler.Mods
         public override string ToString()
         {
             return $"{Name} with {Units.Count} units ({TrainableUnits.Count} buildable) and {Technologies.Count} techs";
+        }
+
+        public Unit GetDropSite(Resource resource)
+        {
+            foreach (var u in Units)
+            {
+                if (u.ResourceGathered == resource && u.DropSite != null)
+                {
+                    return u.DropSite;
+                }
+            }
+
+            return null;
         }
     }
 }
