@@ -6,6 +6,7 @@ using System.Linq;
 using System.Net;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Compiler.Mods
@@ -480,22 +481,38 @@ namespace Compiler.Mods
         {
             var lines = new List<string>();
 
+            var index = 1;
             foreach (var e in Elements)
             {
                 if (e.Gatherers)
                 {
-                    lines.Add($"gl-bo-{lines.Count + 1} = {e.FoodGatherers + 13000}");
-                    lines.Add($"gl-bo-{lines.Count + 1} = {e.WoodGatherers + 12000}");
-                    lines.Add($"gl-bo-{lines.Count + 1} = {e.GoldGatherers + 11000}");
-                    lines.Add($"gl-bo-{lines.Count + 1} = {e.StoneGatherers + 10000}");
+                    lines.Add($"; set food % to {e.FoodGatherers}");
+                    lines.Add($"gl-bo-{index} = {e.FoodGatherers + 13000}");
+                    index++;
+
+                    lines.Add($"; set wood % to {e.WoodGatherers}");
+                    lines.Add($"gl-bo-{index} = {e.WoodGatherers + 12000}");
+                    index++;
+
+                    lines.Add($"; set gold % to {e.GoldGatherers}");
+                    lines.Add($"gl-bo-{index} = {e.GoldGatherers + 11000}");
+                    index++;
+
+                    lines.Add($"; set stone % to {e.StoneGatherers}");
+                    lines.Add($"gl-bo-{index} = {e.StoneGatherers + 10000}");
+                    index++;
                 }
                 else if (e.Research)
                 {
-                    lines.Add($"gl-bo-{lines.Count + 1} = {e.Technology.Id}");
+                    lines.Add($"; research {e.Technology.Id} {e.Technology.Name}");
+                    lines.Add($"gl-bo-{index} = {e.Technology.Id}");
+                    index++;
                 }
                 else
                 {
-                    lines.Add($"gl-bo-{lines.Count + 1} = {-e.Unit.BaseUnit.Id}");
+                    lines.Add($"; build/train {e.Unit.Id} {e.Unit.Name}");
+                    lines.Add($"gl-bo-{index} = {-e.Unit.BaseUnit.Id}");
+                    index++;
                 }
             }
 
@@ -778,70 +795,6 @@ namespace Compiler.Mods
             var cost = GetCost();
             score += cost.Total;
 
-            const int RES = 100;
-            var food = (RES  * cost.Food) / cost.Total;
-            var wood = (RES * cost.Wood) / cost.Total;
-            var gold = (RES * cost.Gold) / cost.Total;
-            var stone = (RES * cost.Stone) / cost.Total;
-
-            for (int i = 0; i < Elements.Count; i++)
-            {
-                var current = Elements[i];
-                if (current.Gatherers == false && current.Research == false)
-                {
-                    if (current.Unit == Civilization.GetDropSite(Resource.Food) && food > 0)
-                    {
-                        score += Math.Max(0, food * i);
-                        food = 0;
-                    }
-                    if (current.Unit == Civilization.GetDropSite(Resource.Wood) && wood > 0)
-                    {
-                        score += Math.Max(0, wood * i);
-                        wood = 0;
-                    }
-                    if (current.Unit == Civilization.GetDropSite(Resource.Gold) && gold > 0)
-                    {
-                        score += Math.Max(0, gold * i);
-                        gold = 0;
-                    }
-                    if (current.Unit == Civilization.GetDropSite(Resource.Stone) && stone > 0)
-                    {
-                        score += Math.Max(0, stone * i);
-                        stone = 0;
-                    }
-                }
-            }
-
-            const int AGE = 200;
-            var age1 = 1 * AGE;
-            var age2 = 1 * AGE;
-            var age3 = 1 * AGE;
-            var age4 = 1 * AGE;
-
-            for (int i = 0; i < Elements.Count; i++)
-            {
-                var current = Elements[i];
-                if (current.Gatherers == false && current.Research == true)
-                {
-                    if (current.Technology == Civilization.Age1Tech)
-                    {
-                        score += Math.Max(0, age1 * i);
-                    }
-                    if (current.Technology == Civilization.Age2Tech)
-                    {
-                        score += Math.Max(0, age2 * i);
-                    }
-                    if (current.Technology == Civilization.Age3Tech)
-                    {
-                        score += Math.Max(0, age3 * i);
-                    }
-                    if (current.Technology == Civilization.Age4Tech)
-                    {
-                        score += Math.Max(0, age4 * i);
-                    }
-                }
-            }
-
             return 1 / score;
         }
 
@@ -874,11 +827,6 @@ namespace Compiler.Mods
                 prior = 50;
             }
 
-            if (be.Research == false && be.Unit == Unit.BuildLocation)
-            {
-                prior = 55;
-            }
-
             if (be.Research == false && be.Unit == Civilization.GetDropSite(Resource.Stone))
             {
                 prior = 60;
@@ -903,6 +851,16 @@ namespace Compiler.Mods
                 || be.Technology == Civilization.Age3Tech || be.Technology == Civilization.Age4Tech))
             {
                 prior = 100;
+            }
+
+            if (be.Research == true && be.Technology.Effect.Commands.Count(c => c is AttributeModifierCommand) > 0)
+            {
+                prior = 120;
+            }
+
+            if (be.Research == false && be.Unit == Unit.BuildLocation)
+            {
+                prior = 150;
             }
 
             if (be.Research == true && be.Technology.Effect.Commands.Count(c => c is UpgradeUnitCommand) > 0)

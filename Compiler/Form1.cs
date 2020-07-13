@@ -69,7 +69,8 @@ namespace Compiler
             // add build orders
             foreach (var civ in mod.Civilizations.Where(c => c.Id != 0))
             {
-                Log.Debug("doing civ " + civ.Name);
+                Log.Debug("doing civ " + civ.Name + " " + civ.Id);
+                sb.AppendLine($"; ----- STARTING CIV {civ.Id} {civ.Name} -----");
                 sb.AppendLine("#if civ-selected " + civ.Id);
 
                 // TODO counters
@@ -106,16 +107,17 @@ namespace Compiler
                         continue;
                     }
 
-                    sb.AppendLine($"#if sn-target == OFF");
-                    sb.AppendLine($"generate-random-number 100");
-                    sb.AppendLine("#if random-number < 10");
-                    sb.AppendLine($"sn-target = {current.Id}");
-                    sb.AppendLine("#end-if");
+                    sb.AppendLine($"#if sn-strategy == OFF");
+                    sb.AppendLine($"    generate-random-number 100");
+                    sb.AppendLine("     #if random-number < 10");
+                    sb.AppendLine($"            sn-strategy = {current.Id}");
+                    sb.AppendLine("     #end-if");
                     sb.AppendLine("#end-if");
 
                     Log.Debug($"unit {current.Id} {current.Name} {current.GetAge(civ)}");
+                    sb.AppendLine($"; --- Going for {current.Id} {current.Name} ---");
 
-                    sb.AppendLine("#if sn-target == " + current.Id);
+                    sb.AppendLine("#if sn-strategy == " + current.Id);
 
                     try
                     {
@@ -136,14 +138,14 @@ namespace Compiler
                     sb.AppendLine("#end-if");
                 }
 
-                sb.AppendLine("#if sn-target == OFF");
-                sb.AppendLine("sn-target = 75");
+                sb.AppendLine("#if sn-strategy == OFF");
+                sb.AppendLine("sn-strategy = 75");
                 sb.AppendLine("#end-if");
 
                 sb.AppendLine("#end-if");
             }
             
-            var file = Path.Combine(folder, "BuildOrder.per");
+            var file = Path.Combine(folder, "Strategies.per");
             File.WriteAllText(file, sb.ToString());
         }
 

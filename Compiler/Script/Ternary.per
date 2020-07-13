@@ -1,38 +1,31 @@
 ﻿(load "Ternary\UserPatchConst")
-(load "Ternary\Const")
 
+;region Defines
+
+(defconst TRUE 1)
+(defconst FALSE 0)
+(defconst ON 1)
+(defconst OFF 0)
+(defconst YES 1)
+(defconst NO 0)
+
+; TODO derive this data from .dat
 (defconst food-dropsite mill)
 (defconst wood-dropsite lumber-camp)
 (defconst gold-dropsite mining-camp)
 (defconst stone-dropsite mining-camp)
+(defconst civilian-unit villager)
+(defconst housing-unit house)
+(defconst food-generating-unit farm)
 
 #defglobal gl-with-escrow = with-escrow
 #defglobal gl-without-escrow = without-escrow
 
-(defrule
-	(true)
-=>
-	(set-strategic-number sn-cap-civilian-explorers 0)
-	(set-strategic-number sn-percent-civilian-explorers 0)
-	(set-strategic-number sn-number-explore-groups 1)
-	(set-strategic-number sn-mill-max-distance 25)
-	(set-strategic-number sn-maximum-hunt-drop-distance 25)
-	(set-strategic-number sn-maximum-food-drop-distance 7)
-	(set-strategic-number sn-maximum-wood-drop-distance 7)
-	(set-strategic-number sn-maximum-gold-drop-distance 7)
-	(set-strategic-number sn-maximum-stone-drop-distance 7)
-	(set-strategic-number sn-attack-intelligence 1)
-	(set-strategic-number sn-enable-patrol-attack 1)
-	(set-strategic-number sn-enable-new-building-system 1)
-	(set-strategic-number sn-wall-targeting-mode 1)
-	(disable-self)
-)
-
-; defines
 
 #repeat-timer ti-repeat-7 1 7
 #repeat-timer ti-repeat-1m 2 61
-(defconst ti-attack-timer 3)
+#repeat-timer ti-repeat-23 3 23
+(defconst ti-attack-timer 11)
 (defrule
 	(true)
 =>
@@ -54,7 +47,7 @@
 #defstrategic sn-percentage-extra-gold = 0; same for gold
 #defstrategic sn-percentage-extra-stone = 0; same for stone
 
-#defstrategic sn-target = OFF
+#defstrategic sn-strategy = OFF
 #defstrategic sn-primary-unit = OFF;
 #defstrategic sn-secondary-unit = OFF;
 #defstrategic sn-siege-unit = OFF;
@@ -66,13 +59,57 @@
 
 #defglobal gl-bo-count = 0
 
-(load "Ternary\BuildOrder")
+;endregion
 
-;region Build Order
+;region Strategies
 
-#if timer-triggered ti-repeat-7
+(load "Ternary\Strategies")
 
-	up-store-type-name s: sn-target
+;endregion
+
+;region Various
+
+(defrule
+	(true)
+=>
+	(set-strategic-number sn-cap-civilian-explorers 0)
+	(set-strategic-number sn-percent-civilian-explorers 0)
+	(set-strategic-number sn-number-explore-groups 1)
+	(set-strategic-number sn-minimum-attack-group-size 1)
+	(set-strategic-number sn-maximum-attack-group-size 4)
+	(set-strategic-number sn-attack-intelligence 1)
+	(set-strategic-number sn-enable-patrol-attack 1)
+	(set-strategic-number sn-enable-new-building-system 1)
+	(set-strategic-number sn-wall-targeting-mode 1)
+	(disable-self)
+)
+
+(defrule
+	(true)
+=>
+	(set-strategic-number sn-mill-max-distance 25)
+	(set-strategic-number sn-maximum-hunt-drop-distance 25)
+	(set-strategic-number sn-maximum-food-drop-distance 7)
+	(set-strategic-number sn-maximum-wood-drop-distance 7)
+	(set-strategic-number sn-maximum-gold-drop-distance 7)
+	(set-strategic-number sn-maximum-stone-drop-distance 7)
+	(disable-self)
+)
+
+#if (building-type-count-total town-center == 0) (civilian-population < 5) (military-population < 5) (game-time > 1800)
+
+	chat-to-all "gg"
+	resign
+	
+#end-if
+
+;endregion
+
+;region Build Order execution
+
+#if timer-triggered ti-repeat-23
+
+	up-store-type-name s: sn-strategy
 	up-chat-data-to-self "Going for %s" c: 7031232
 	
 #end-if
@@ -98,6 +135,7 @@ var gl-current
 		; set gatherers
 		#if gl-current >= 10000
 		
+			; set food %
 			#if gl-current >= 13000
 			
 				gl-current -= 13000
@@ -108,6 +146,7 @@ var gl-current
 				
 			#end-if
 			
+			; set wood %
 			#if gl-current >= 12000
 			
 				gl-current -= 12000
@@ -118,6 +157,7 @@ var gl-current
 				
 			#end-if
 			
+			; set gold %
 			#if gl-current >= 11000
 			
 				gl-current -= 11000
@@ -128,6 +168,7 @@ var gl-current
 				
 			#end-if
 			
+			; set stone %
 			#if gl-current >= 10000
 			
 				gl-current -= 10000
@@ -140,14 +181,14 @@ var gl-current
 			
 		#else
 		
-			; research
+			; research tech
 			#if gl-current > 0
 			
 				#if up-research-status g: gl-current < research-pending
 				
 					gl-done = TRUE
 					
-					#if timer-triggered ti-repeat-7
+					#if timer-triggered ti-repeat-23
 					
 						up-store-tech-name g: gl-current
 						up-chat-data-to-self "Waiting for %s" c: 7031232
@@ -168,7 +209,7 @@ var gl-current
 					
 				#end-if
 			
-			; unit
+			; build unit
 			#else
 			
 				gl-current *= -1
@@ -183,7 +224,7 @@ var gl-current
 						gl-done = TRUE
 						
 						up-store-type-name g: gl-current
-						#if timer-triggered ti-repeat-7
+						#if timer-triggered ti-repeat-23
 						
 							up-chat-data-to-self "Waiting for %s" c: 7031232
 							
@@ -362,26 +403,26 @@ sn-wood-gatherer-percentage = gl-wood
 sn-gold-gatherer-percentage = gl-gold
 sn-stone-gatherer-percentage = gl-stone
 
-#if (civilian-population < 120) (can-train-with-escrow villager)
+#if (civilian-population < 120) (can-train-with-escrow civilian-unit)
 
-	up-train gl-with-escrow c: villager
+	up-train gl-with-escrow c: civilian-unit
 	
 #end-if
 
-#if (housing-headroom < 10) (population-headroom > 0) (can-build house) (up-pending-objects c: house c:< 2)
+#if (housing-headroom < 10) (population-headroom > 0) (can-build housing-unit) (up-pending-objects c: housing-unit c:< 2)
 
-	up-build place-normal gl-with-escrow c: house
+	up-build place-normal gl-with-escrow c: housing-unit
 	
 #end-if
 
-#if (idle-farm-count < 3) (can-build farm) (up-pending-objects c: farm c:< 3) (dropsite-min-distance wood < 3)
+#if (idle-farm-count < 3) (can-build food-generating-unit) (up-pending-objects c: food-generating-unit c:< 3) (dropsite-min-distance wood < 3)
 
-	build farm
+	build food-generating-unit
 	
 #end-if
 
 var gl-mill
-up-get-fact building-type-count-total farm gl-mill
+up-get-fact building-type-count-total food-generating-unit gl-mill
 gl-mill /= 8
 gl-mill max= 1
 
@@ -451,6 +492,7 @@ gl-pop-cap -= 10
 	
 		sn-maximum-town-size = 500
 		sn-number-explore-groups = 10
+		sn-number-attack-groups = 10
 	
 	#else
 	
@@ -467,6 +509,7 @@ gl-pop-cap -= 10
 
 	sn-maximum-town-size = 20
 	sn-number-explore-groups = 1
+	sn-number-attack-groups = 0
 	
 	#if current-age == feudal-age
 	
@@ -496,13 +539,3 @@ gl-pop-cap -= 10
 #end-if
 ;endregion
 
-;region Various
-
-#if (building-type-count-total town-center == 0) (civilian-population < 5) (military-population < 5) (game-time > 1800)
-
-	chat-to-all "gg"
-	resign
-	
-#end-if
-
-;endregion
