@@ -20,7 +20,7 @@ namespace Compiler
         [STAThread]
         static void Main()
         {
-            Test();
+            //Test();
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
             Application.Run(new Form1());

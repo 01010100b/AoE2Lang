@@ -1,12 +1,495 @@
-﻿(defrule
+﻿(load "Ternary\UserPatchConst")
+(load "Ternary\Const")
+
+(defconst food-dropsite mill)
+(defconst wood-dropsite lumber-camp)
+(defconst gold-dropsite mining-camp)
+(defconst stone-dropsite mining-camp)
+
+#defglobal gl-with-escrow = with-escrow
+#defglobal gl-without-escrow = without-escrow
+
+(defrule
 	(true)
 =>
 	(set-strategic-number sn-cap-civilian-explorers 0)
 	(set-strategic-number sn-percent-civilian-explorers 0)
-	(set-strategic-number sn-maximum-food-drop-distance -2)
-	(set-strategic-number sn-maximum-wood-drop-distance -2)
-	(set-strategic-number sn-maximum-gold-drop-distance -2)
-	(set-strategic-number sn-maximum-stone-drop-distance -2)
-	(set-strategic-number sn-maximum-hunt-drop-distance -2)
+	(set-strategic-number sn-number-explore-groups 1)
+	(set-strategic-number sn-mill-max-distance 25)
+	(set-strategic-number sn-maximum-hunt-drop-distance 25)
+	(set-strategic-number sn-maximum-food-drop-distance 7)
+	(set-strategic-number sn-maximum-wood-drop-distance 7)
+	(set-strategic-number sn-maximum-gold-drop-distance 7)
+	(set-strategic-number sn-maximum-stone-drop-distance 7)
+	(set-strategic-number sn-attack-intelligence 1)
+	(set-strategic-number sn-enable-patrol-attack 1)
+	(set-strategic-number sn-enable-new-building-system 1)
+	(set-strategic-number sn-wall-targeting-mode 1)
 	(disable-self)
 )
+
+; defines
+
+#repeat-timer ti-repeat-7 1 7
+#repeat-timer ti-repeat-1m 2 61
+(defconst ti-attack-timer 3)
+(defrule
+	(true)
+=>
+	(enable-timer ti-attack-timer 120)
+	(disable-self)
+)
+
+(defconst gl-cost-food 460) ; use for up-cost functions
+(defconst gl-cost-wood 461)
+(defconst gl-cost-stone 462)
+(defconst gl-cost-gold 463)
+
+#defstrategic sn-min-food-gatherer = 7 ; minimum number of food gatherers
+#defstrategic sn-min-wood-gatherer = 3 ; minimum number of wood gatherers
+#defstrategic sn-min-gold-gatherer = 0 ; minimum number of gold gatherers
+#defstrategic sn-min-stone-gatherer = 0 ; minimum number of stone gatherers
+#defstrategic sn-percentage-extra-food = 0 ; percentage of extra villagers (over the minima above) that gets sent to food
+#defstrategic sn-percentage-extra-wood = 0 ; same for wood
+#defstrategic sn-percentage-extra-gold = 0; same for gold
+#defstrategic sn-percentage-extra-stone = 0; same for stone
+
+#defstrategic sn-target = OFF
+#defstrategic sn-primary-unit = OFF;
+#defstrategic sn-secondary-unit = OFF;
+#defstrategic sn-siege-unit = OFF;
+
+(defconst gl-bo 1)
+#foreach $i in {100}
+(defconst gl-bo-$i $i)
+#end-foreach
+
+#defglobal gl-bo-count = 0
+
+(load "Ternary\BuildOrder")
+
+;region Build Order
+
+#if timer-triggered ti-repeat-7
+
+	up-store-type-name s: sn-target
+	up-chat-data-to-self "Going for %s" c: 7031232
+	
+#end-if
+
+up-setup-cost-data 1 gl-cost-food
+
+; perform bo
+
+var gl-done = FALSE
+var gl-pointer
+var gl-current
+;chat-local-to-self "new loop"
+#for 0 gl-bo-count gl-i 
+
+	#if gl-done == FALSE
+	
+		;up-chat-data-to-self "start %d" g: gl-i
+		up-modify-goal gl-pointer c:= gl-bo
+		gl-pointer += gl-i
+	
+		up-get-indirect-goal g: gl-pointer gl-current
+		
+		; set gatherers
+		#if gl-current >= 10000
+		
+			#if gl-current >= 13000
+			
+				gl-current -= 13000
+				sn-percentage-extra-food = gl-current
+				gl-current = 0
+				
+				;up-chat-data-to-self "Set food %d" s: sn-percentage-extra-food
+				
+			#end-if
+			
+			#if gl-current >= 12000
+			
+				gl-current -= 12000
+				sn-percentage-extra-wood = gl-current
+				gl-current = 0
+				
+				;up-chat-data-to-self "Set wood %d" s: sn-percentage-extra-wood
+				
+			#end-if
+			
+			#if gl-current >= 11000
+			
+				gl-current -= 11000
+				sn-percentage-extra-gold = gl-current
+				gl-current = 0
+				
+				;up-chat-data-to-self "Set gold %d" s: sn-percentage-extra-gold
+				
+			#end-if
+			
+			#if gl-current >= 10000
+			
+				gl-current -= 10000
+				sn-percentage-extra-stone = gl-current
+				gl-current = 0
+				
+				;up-chat-data-to-self "Set stone %d" s: sn-percentage-extra-stone
+				
+			#end-if
+			
+		#else
+		
+			; research
+			#if gl-current > 0
+			
+				#if up-research-status g: gl-current < research-pending
+				
+					gl-done = TRUE
+					
+					#if timer-triggered ti-repeat-7
+					
+						up-store-tech-name g: gl-current
+						up-chat-data-to-self "Waiting for %s" c: 7031232
+					
+					#end-if
+					
+					up-add-research-cost g: gl-current c: 1
+					
+					#if up-can-research gl-with-escrow g: gl-current
+					
+						up-release-escrow
+						up-research gl-with-escrow g: gl-current
+						
+						up-store-tech-name g: gl-current
+						up-chat-data-to-self "Researching %s" c: 7031232
+
+					#end-if
+					
+				#end-if
+			
+			; unit
+			#else
+			
+				gl-current *= -1
+				
+				#if up-object-type-count-total g: gl-current == 0
+				
+					var gl-current-upgrade
+					up-get-object-type-data g: gl-current object-data-upgrade-type gl-current-upgrade
+
+					#if up-object-type-count-total g: gl-current-upgrade == 0
+					
+						gl-done = TRUE
+						
+						up-store-type-name g: gl-current
+						#if timer-triggered ti-repeat-7
+						
+							up-chat-data-to-self "Waiting for %s" c: 7031232
+							
+						
+						#end-if
+						
+						;up-chat-data-to-self "Id %d" g: gl-current
+						;up-chat-data-to-self "done %d" g: gl-done
+						
+						up-add-object-cost g: gl-current c: 1
+						
+						#if (gl-current != food-dropsite) (gl-current != wood-dropsite) (gl-current != gold-dropsite) (gl-current != stone-dropsite)
+						
+							var gl-type
+							up-get-object-type-data g: gl-current object-data-category gl-type
+							
+							#if (up-can-build gl-with-escrow g: gl-current) (gl-type == 80)
+					
+								up-release-escrow
+								up-build place-normal gl-with-escrow g: gl-current
+						
+								up-chat-data-to-self "Building %s" c: 7031232
+								
+							#end-if
+						
+						#else
+							var gl-built = FALSE
+							
+							#if (up-can-build gl-with-escrow g: gl-current) (gl-current == food-dropsite) (or (resource-found food) (game-time > 240)) (gl-built == FALSE)
+					
+								up-release-escrow
+								up-build place-normal gl-with-escrow g: gl-current
+								gl-built = TRUE
+								
+								up-chat-data-to-self "Building %s" c: 7031232
+								
+							#end-if
+							
+							#if (up-can-build gl-with-escrow g: gl-current) (gl-current == wood-dropsite) (or (resource-found wood) (game-time > 240)) (gl-built == FALSE)
+					
+								up-release-escrow
+								up-build place-normal gl-with-escrow g: gl-current
+								gl-built = TRUE
+								
+								up-chat-data-to-self "Building %s" c: 7031232
+								
+							#end-if
+							
+							#if (up-can-build gl-with-escrow g: gl-current) (gl-current == gold-dropsite) (or (resource-found gold) (game-time > 240)) (gl-built == FALSE)
+					
+								up-release-escrow
+								up-build place-normal gl-with-escrow g: gl-current
+								gl-built = TRUE
+								
+								up-chat-data-to-self "Building %s" c: 7031232
+								
+							#end-if
+							
+							#if (up-can-build gl-with-escrow g: gl-current) (gl-current == stone-dropsite) (or (resource-found stone) (game-time > 240)) (gl-built == FALSE)
+					
+								up-release-escrow
+								up-build place-normal gl-with-escrow g: gl-current
+								gl-built = TRUE
+								
+								up-chat-data-to-self "Building %s" c: 7031232
+								
+							#end-if
+						
+						#end-if
+					
+						#if up-can-train gl-with-escrow g: gl-current
+					
+							up-release-escrow
+							up-train gl-with-escrow g: gl-current
+						
+							up-chat-data-to-self "Training %s" c: 7031232
+						
+						#end-if
+					
+					#end-if
+					
+				#end-if
+			
+			#end-if
+			
+			gl-done += 1
+			gl-done -= 1
+			
+		#end-if
+		
+	#end-if
+	
+#end-for
+
+set-escrow-percentage food 50
+set-escrow-percentage wood 50
+set-escrow-percentage gold 50
+set-escrow-percentage stone 50
+
+gl-cost-food max= 100
+gl-cost-wood max= 100
+gl-cost-gold max= 100
+gl-cost-stone max= 100
+
+#if up-resource-amount amount-food g:> gl-cost-food
+
+	set-escrow-percentage food 0
+	
+#end-if
+
+#if up-resource-amount amount-wood g:> gl-cost-wood
+
+	set-escrow-percentage wood 0
+	
+#end-if
+
+#if up-resource-amount amount-gold g:> gl-cost-gold
+
+	set-escrow-percentage gold 0
+	
+#end-if
+
+#if up-resource-amount amount-stone g:> gl-cost-stone
+
+	set-escrow-percentage stone 0
+	
+#end-if
+
+;endregion
+
+;region Eco
+
+var gl-civ
+up-get-fact civilian-population 0 gl-civ
+
+var gl-remaining
+gl-remaining = gl-civ
+gl-remaining -= sn-min-food-gatherer
+gl-remaining -= sn-min-wood-gatherer
+gl-remaining -= sn-min-gold-gatherer
+gl-remaining -= sn-min-stone-gatherer
+
+var gl-food = 0
+var gl-wood = 0
+var gl-gold = 0
+var gl-stone = 0
+
+#if gl-remaining > 0
+
+	gl-food = gl-remaining
+	gl-food %*= sn-percentage-extra-food
+	
+	gl-wood = gl-remaining
+	gl-wood %*= sn-percentage-extra-wood
+	
+	gl-gold = gl-remaining
+	gl-gold %*= sn-percentage-extra-gold
+	
+	gl-stone = gl-remaining
+	gl-stone %*= sn-percentage-extra-stone
+
+#end-if
+
+gl-food += sn-min-food-gatherer
+gl-wood += sn-min-wood-gatherer
+gl-gold += sn-min-gold-gatherer
+gl-stone += sn-min-stone-gatherer
+
+gl-food %/= gl-civ
+gl-wood %/= gl-civ
+gl-gold %/= gl-civ
+gl-stone %/= gl-civ
+
+sn-food-gatherer-percentage = gl-food
+sn-wood-gatherer-percentage = gl-wood
+sn-gold-gatherer-percentage = gl-gold
+sn-stone-gatherer-percentage = gl-stone
+
+#if (civilian-population < 120) (can-train-with-escrow villager)
+
+	up-train gl-with-escrow c: villager
+	
+#end-if
+
+#if (housing-headroom < 10) (population-headroom > 0) (can-build house) (up-pending-objects c: house c:< 2)
+
+	up-build place-normal gl-with-escrow c: house
+	
+#end-if
+
+#if (idle-farm-count < 3) (can-build farm) (up-pending-objects c: farm c:< 3) (dropsite-min-distance wood < 3)
+
+	build farm
+	
+#end-if
+
+var gl-mill
+up-get-fact building-type-count-total farm gl-mill
+gl-mill /= 8
+gl-mill max= 1
+
+#if (up-object-type-count-total c: food-dropsite g:< gl-mill) (can-build-with-escrow food-dropsite) (up-pending-objects c: food-dropsite c:== 0) (or (building-type-count food-dropsite > 0) (game-time > 300))
+
+	up-build place-normal gl-with-escrow c: food-dropsite
+	sn-mill-max-distance += 2
+	
+	chat-local-to-self "getting mill"
+	
+#end-if
+
+#foreach $resource in wood gold stone
+
+	#if (resource-found $resource) (dropsite-min-distance $resource > 2) (sn-$resource-gatherer-percentage > 0)
+	
+		#if (can-build-with-escrow $resource-dropsite) (or (building-type-count $resource-dropsite > 0) (game-time > 300))
+		
+			up-build place-normal gl-with-escrow c: $resource-dropsite
+			sn-camp-max-distance += 2
+			
+		#end-if
+	
+	#end-if
+
+#end-foreach
+
+;endregion
+
+;region Attack
+
+#if (sn-primary-unit != OFF)
+
+	var gl-unit
+	up-get-object-type-data s: sn-primary-unit object-data-type gl-unit
+	
+	#if up-can-train gl-without-escrow g: gl-unit
+	
+		up-train gl-without-escrow g: gl-unit
+		
+	#end-if
+	
+	#if (timer-triggered ti-repeat-1m) (not (up-train-site-ready g: gl-unit))
+	
+		var gl-train-site
+		up-get-object-type-data g: gl-unit object-data-train-site gl-train-site
+		
+		#if (up-can-build gl-with-escrow g: gl-train-site) (up-object-type-count-total g: gl-train-site c:> 0)
+		
+			up-build place-normal gl-with-escrow g: gl-train-site
+			
+		#end-if
+		
+	#end-if
+
+#end-if
+
+var gl-target-mil
+up-get-target-fact military-population 0 gl-target-mil
+var gl-pop-cap
+up-get-fact population-cap 0 gl-pop-cap
+gl-pop-cap -= 10
+
+#if (military-population > 20) (or (up-resource-amount amount-military-population g:>= gl-target-mil) (up-resource-amount amount-population g:>= gl-pop-cap))
+
+	#if (up-building-type-in-town c: town-center c:== 0) (up-building-type-in-town c: watch-tower c:== 0) (up-building-type-in-town c: castle c:== 0) (timer-triggered ti-attack-timer)
+	
+		sn-maximum-town-size += 3
+		up-chat-data-to-self "Increasing max town size to %d" s: sn-maximum-town-size
+		
+	#end-if
+	
+	#if sn-maximum-town-size > 500
+	
+		sn-maximum-town-size = 500
+		sn-number-explore-groups = 10
+		
+	#end-if
+	
+#else
+
+	sn-maximum-town-size = 20
+	sn-number-explore-groups = 1
+	
+	#if current-age == feudal-age
+	
+		sn-maximum-town-size = 25
+		
+	#end-if
+	
+	#if current-age == castle-age
+	
+		sn-maximum-town-size = 30
+		
+	#end-if
+	
+	#if current-age == imperial-age
+	
+		sn-maximum-town-size = 35
+		
+	#end-if
+	
+	#if timer-triggered ti-attack-timer
+	
+		disable-timer ti-attack-timer
+		enable-timer ti-attack-timer 120
+		
+	#end-if
+
+#end-if
+;endregion

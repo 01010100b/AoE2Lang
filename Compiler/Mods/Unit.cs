@@ -22,19 +22,9 @@ namespace Compiler.Mods
         public Resource ResourceGathered => GetResourceGathered();
 
         public Unit BuildLocation { get; internal set; } = null;
-        public Unit UpgradedFrom { get; internal set; } = null;
-        public Unit UpgradesTo { get; internal set; } = null;
-        public Unit BaseUnit { get
-            {
-                var current = this;
-                while (current.UpgradedFrom != null)
-                {
-                    current = current.UpgradedFrom;
-                }
-
-                return current;
-            }
-        }
+        public HashSet<Unit> UpgradedFrom { get; internal set; } = new HashSet<Unit>();
+        public HashSet<Unit> UpgradesTo { get; internal set; } = new HashSet<Unit>();
+        public Unit BaseUnit => UpgradedFrom.FirstOrDefault(u => u.UpgradedFrom.Count == 0) ?? this;
         public Unit StackUnit { get; internal set; } = null;
         public Unit HeadUnit { get; internal set; } = null;
         public Unit TransformUnit { get; internal set; } = null;
@@ -151,7 +141,17 @@ namespace Compiler.Mods
 
         public int GetAge(Civilization civilization)
         {
-            var bo = new BuildOrder(civilization, this);
+            BuildOrder bo;
+            try
+            {
+                bo = new BuildOrder(civilization, this);
+            }
+            catch (Exception e)
+            {
+                Log.Debug($"no bo for {Id}");
+                return -1;
+            }
+
             var age = 1;
             if (bo.Elements.Count(be => be.Gatherers == false && be.Research == true && be.Technology == civilization.Age2Tech) > 0)
             {
@@ -186,6 +186,33 @@ namespace Compiler.Mods
             }
 
             return resource;
+        }
+
+        public Technology GetRequiredTech(Civilization civilization)
+        {
+            foreach (var tech in civilization.Technologies.Where(t => t.Effect != null))
+            {
+                foreach (var command in tech.Effect.Commands)
+                {
+                    if (command is EnableDisableUnitCommand ec)
+                    {
+                        if (ec.Enable == true && ec.UnitId == Id)
+                        {
+                            return tech;
+                        }
+                    }
+
+                    if (command is UpgradeUnitCommand uc)
+                    {
+                        if (uc.ToUnitId == Id)
+                        {
+                            return tech;
+                        }
+                    }
+                }
+            }
+
+            return null;
         }
     }
 }

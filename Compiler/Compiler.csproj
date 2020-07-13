@@ -102,6 +102,8 @@
     </Compile>
     <None Include="Script\Ternary.ai" />
     <None Include="Script\Ternary.per" />
+    <None Include="Script\Ternary\Const.per" />
+    <None Include="Script\Ternary\UserPatchConst.per" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="def.txt" />

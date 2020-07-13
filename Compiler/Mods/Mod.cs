@@ -118,8 +118,8 @@ namespace Compiler.Mods
                 {
                     if (units.TryGetValue(uc.ToUnitId, out Unit to))
                     {
-                        from.UpgradesTo = to;
-                        to.UpgradedFrom = from;
+                        from.UpgradesTo.Add(to);
+                        to.UpgradedFrom.Add(from);
                     }
                 }
             }
