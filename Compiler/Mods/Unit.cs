@@ -139,6 +139,11 @@ namespace Compiler.Mods
             return new Cost(FoodCost, WoodCost, GoldCost, StoneCost);
         }
 
+        public UnitStats GetStats(List<Effect> effects)
+        {
+            return new UnitStats(new Cost(FoodCost, WoodCost, GoldCost, StoneCost));
+        }
+
         public int GetAge(Civilization civilization)
         {
             BuildOrder bo;

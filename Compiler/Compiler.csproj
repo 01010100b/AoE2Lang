@@ -69,6 +69,7 @@
     <Compile Include="Mods\Mod.cs" />
     <Compile Include="Mods\Technology.cs" />
     <Compile Include="Mods\Unit.cs" />
+    <Compile Include="Mods\UnitStats.cs" />
     <Compile Include="Parser.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
