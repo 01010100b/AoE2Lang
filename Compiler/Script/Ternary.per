@@ -447,17 +447,19 @@ gl-pop-cap -= 10
 
 #if (military-population > 20) (or (up-resource-amount amount-military-population g:>= gl-target-mil) (up-resource-amount amount-population g:>= gl-pop-cap))
 
-	#if (up-building-type-in-town c: town-center c:== 0) (up-building-type-in-town c: watch-tower c:== 0) (up-building-type-in-town c: castle c:== 0) (timer-triggered ti-attack-timer)
-	
-		sn-maximum-town-size += 3
-		up-chat-data-to-self "Increasing max town size to %d" s: sn-maximum-town-size
-		
-	#end-if
-	
 	#if sn-maximum-town-size > 500
 	
 		sn-maximum-town-size = 500
 		sn-number-explore-groups = 10
+	
+	#else
+	
+		#if (up-building-type-in-town c: town-center c:== 0) (up-building-type-in-town c: watch-tower c:== 0) (up-building-type-in-town c: castle c:== 0) (timer-triggered ti-attack-timer)
+	
+			sn-maximum-town-size += 3
+			up-chat-data-to-self "Increasing max town size to %d" s: sn-maximum-town-size
+		
+		#end-if
 		
 	#end-if
 	
@@ -492,4 +494,15 @@ gl-pop-cap -= 10
 	#end-if
 
 #end-if
+;endregion
+
+;region Various
+
+#if (building-type-count-total town-center == 0) (civilian-population < 5) (military-population < 5) (game-time > 1800)
+
+	chat-to-all "gg"
+	resign
+	
+#end-if
+
 ;endregion

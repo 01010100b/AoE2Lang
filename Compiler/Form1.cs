@@ -75,7 +75,15 @@ namespace Compiler
                 // TODO counters
                 //sb.AppendLine("sn-target = 75");
 
-                foreach (var unit in civ.TrainableUnits.Where(u => u.Land).Select(u => u.BaseUnit).Distinct().OrderBy(u => rng.Next()).ToList())
+                var units = civ.TrainableUnits
+                    .Where(u => u.Land)
+                    .Select(u => u.BaseUnit)
+                    .Where(u => u.BuildLocation != null)
+                    .Distinct()
+                    .OrderBy(u => rng.Next())
+                    .ToList();
+
+                foreach (var unit in units)
                 {
                     var current = unit;
 
