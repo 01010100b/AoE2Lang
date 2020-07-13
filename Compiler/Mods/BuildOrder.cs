@@ -518,7 +518,7 @@ namespace Compiler.Mods
 
             var sb = new StringBuilder();
             sb.AppendLine($"sn-primary-unit = {Unit.BaseUnit.Id}");
-            sb.AppendLine($"gl-bo-count = " + lines.Count);
+            sb.AppendLine($"gl-bo-count = {index - 1}");
             foreach (var line in lines)
             {
                 sb.AppendLine(line);

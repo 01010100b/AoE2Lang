@@ -114,7 +114,7 @@
 	
 #end-if
 
-up-setup-cost-data 1 gl-cost-food
+
 
 ; perform bo
 
@@ -126,6 +126,7 @@ var gl-current
 
 	#if gl-done == FALSE
 	
+		up-setup-cost-data 1 gl-cost-food
 		;up-chat-data-to-self "start %d" g: gl-i
 		up-modify-goal gl-pointer c:= gl-bo
 		gl-pointer += gl-i
