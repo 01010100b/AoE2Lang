@@ -8,11 +8,33 @@ namespace Compiler.Mods
 {
     class UnitStats
     {
-        public readonly Cost Cost;
-
-        public UnitStats(Cost cost)
+        public struct ArmorValue
         {
-            Cost = cost;
+            public readonly int Id;
+            public readonly int Amount;
+
+            public ArmorValue(int id, int amount)
+            {
+                Id = id;
+                Amount = amount;
+            }
+        }
+
+        public readonly Cost Cost;
+        public readonly int Hitpoints;
+        public readonly int Range;
+        public readonly double ReloadTime;
+        public readonly List<ArmorValue> Armors;
+        public readonly List<ArmorValue> Attacks;
+
+        public UnitStats(Unit unit, List<Effect> effects)
+        {
+            Cost = unit.BaseCost;
+            Hitpoints = unit.BaseHitpoints;
+            Range = unit.BaseRange;
+            ReloadTime = unit.BaseReloadTime;
+            Armors = unit.BaseArmors.ToList();
+            Attacks = unit.BaseAttacks.ToList();
         }
     }
 }

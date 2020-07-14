@@ -48,6 +48,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Compiler.cs" />
+    <Compile Include="CounterGenerator.cs" />
     <Compile Include="Form1.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -103,7 +104,6 @@
     </Compile>
     <None Include="Script\Ternary.ai" />
     <None Include="Script\Ternary.per" />
-    <None Include="Script\Ternary\Const.per" />
     <None Include="Script\Ternary\UserPatchConst.per" />
   </ItemGroup>
   <ItemGroup>

@@ -16,6 +16,7 @@ namespace Compiler.Mods
         public readonly List<Technology> Prerequisites = new List<Technology>();
         public int MinPrerequisites => Math.Min(RequiredTechCount, Prerequisites.Count);
         public Resource ResourceImproved { get; internal set; } = Resource.None;
+        public bool Free => FoodCost + WoodCost + GoldCost + StoneCost == 0;
 
         private readonly int FoodCost = 0;
         private readonly int WoodCost = 0;

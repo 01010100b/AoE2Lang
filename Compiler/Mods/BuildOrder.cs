@@ -25,7 +25,7 @@ namespace Compiler.Mods
             public readonly int GoldGatherers;
             public readonly int StoneGatherers;
 
-            public bool Buildable => !(Research && Technology.ResearchLocation == null);
+            public bool Buildable => Research == false || (Technology.Free == false && Technology.ResearchLocation != null);
 
             public BuildElement(bool research, Unit unit, Technology technology)
             {
@@ -119,7 +119,6 @@ namespace Compiler.Mods
         private readonly Dictionary<Unit, List<BuildElement>> KnownUnits;
         private readonly Dictionary<Technology, List<BuildElement>> KnownTechnologies;
         private readonly List<Unit> AvailableUnits;
-        private readonly HashSet<Technology> UnitStateTechnologies;
 
         private readonly Random Random;
 
@@ -139,22 +138,17 @@ namespace Compiler.Mods
             KnownUnits = new Dictionary<Unit, List<BuildElement>>();
             KnownTechnologies = new Dictionary<Technology, List<BuildElement>>();
             AvailableUnits = Civilization.AvailableUnits.Where(u => u.Land).ToList();
-            UnitStateTechnologies = new HashSet<Technology>();
 
-            // get unit state techs
-            foreach (var tech in civilization.Technologies.Where(t => t.Effect != null))
+            var bo = GetUnit(unit);
+            if (bo == null)
             {
-                foreach (var command in tech.Effect.Commands)
-                {
-                    if (command is AttributeModifierCommand || command is EnableDisableUnitCommand || command is UpgradeUnitCommand)
-                    {
-                        UnitStateTechnologies.Add(tech);
-                    }
-                }
+                Elements = null;
             }
-
-            Elements = GetUnit(unit).Where(e => e.Buildable).ToList();
-            Clean();
+            else
+            {
+                Elements = bo.Where(e => e.Buildable).ToList();
+                Clean();
+            }
         }
 
         public List<BuildElement> GetTechPartial(Technology tech)
@@ -170,7 +164,7 @@ namespace Compiler.Mods
         public void AddUpgrades()
         {
             // add upgrades
-            foreach (var tech in UnitStateTechnologies)
+            foreach (var tech in Civilization.Technologies.Where(t => t.Effect != null))
             {
                 foreach (var command in tech.Effect.Commands)
                 {
@@ -192,11 +186,11 @@ namespace Compiler.Mods
             var current = Unit;
             var found = true;
 
-            while (found)
+            while (found && current != null)
             {
                 found = false;
 
-                foreach (var tech in UnitStateTechnologies)
+                foreach (var tech in Civilization.Technologies.Where(t => t.Effect != null))
                 {
                     foreach (var command in tech.Effect.Commands)
                     {
@@ -204,10 +198,11 @@ namespace Compiler.Mods
                         {
                             if (uc.FromUnitId == current.Id)
                             {
-                                current = AvailableUnits.Single(u => u.Id == uc.ToUnitId);
+                                
                                 var bo = GetTech(tech);
                                 Elements.AddRange(bo.Where(e => e.Buildable));
 
+                                current = AvailableUnits.FirstOrDefault(u => u.Id == uc.ToUnitId);
                                 found = true;
                                 break;
                             }
@@ -228,7 +223,7 @@ namespace Compiler.Mods
         {
             var vills = Civilization.Units.Where(u => u.ClassId == 4).ToList();
 
-            foreach (var tech in UnitStateTechnologies)
+            foreach (var tech in Civilization.Technologies.Where(t => t.Effect != null))
             {
                 foreach (var command in tech.Effect.Commands)
                 {
@@ -237,8 +232,7 @@ namespace Compiler.Mods
                         var unit = vills.FirstOrDefault(u => u.Id == ac.UnitId);
                         if (unit != null || ac.ClassId == 4)
                         {
-                            if (ac.Attribute == Attribute.WorkRate || ac.Attribute == Attribute.TrainTime 
-                                || ac.Attribute == Attribute.CarryCapacity)
+                            if (true)
                             {
                                 var bo = GetTech(tech);
                                 if (bo != null)
@@ -580,7 +574,7 @@ namespace Compiler.Mods
             // required tech
             if (unit.TechRequired)
             {
-                foreach (var tech in UnitStateTechnologies)
+                foreach (var tech in Civilization.Technologies.Where(t => t.Effect != null))
                 {
                     foreach (var command in tech.Effect.Commands)
                     {
@@ -859,6 +853,22 @@ namespace Compiler.Mods
             }
 
             if (be.Research == false && be.Unit == Unit.BuildLocation)
+            {
+                prior = 150;
+            }
+
+            if (be.Research == true && be.Technology.Effect.Commands.Count(c =>
+            {
+                if (c is EnableDisableUnitCommand ec)
+                {
+                    if (ec.Enable == true && ec.UnitId == Unit.Id)
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            }) > 0)
             {
                 prior = 150;
             }

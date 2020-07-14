@@ -14,6 +14,8 @@ namespace Compiler
 {
     static class Program
     {
+        public const double FPS = 60;
+
         /// <summary>
         /// The main entry point for the application.
         /// </summary>

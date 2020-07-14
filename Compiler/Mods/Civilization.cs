@@ -18,12 +18,13 @@ namespace Compiler.Mods
         public readonly List<Unit> Units = new List<Unit>();
         public readonly List<Unit> ExtraUnits = new List<Unit>();
         public readonly Dictionary<Resource, float> Resources = new Dictionary<Resource, float>();
+
         public Technology Age1Tech => Technologies.Single(t => t.Id == (int)Resources[Resource.Age1Tech]);
         public Technology Age2Tech => Technologies.Single(t => t.Id == (int)Resources[Resource.Age2Tech]);
         public Technology Age3Tech => Technologies.Single(t => t.Id == (int)Resources[Resource.Age3Tech]);
         public Technology Age4Tech => Technologies.Single(t => t.Id == (int)Resources[Resource.Age4Tech]);
         public List<Unit> AvailableUnits => Units.Where(u => u.Available || u.TechRequired).ToList();
-        public List<Unit> TrainableUnits => AvailableUnits.Where(u => u.BuildLocation != null).ToList();
+        public List<Unit> TrainableUnits => AvailableUnits.Where(u => u.BuildLocation != null && new BuildOrder(this, u).Elements != null).ToList();
 
         public Civilization(int id, YTY.AocDatLib.Civilization civilization, Mod mod)
         {
@@ -41,6 +42,17 @@ namespace Compiler.Mods
             foreach (var command in effect.Commands.Where(c => c is DisableTechCommand).Cast<DisableTechCommand>())
             {
                 set.Remove(command.TechId);
+            }
+
+            foreach (var tech in mod.Technologies.Where(t => t.Effect != null && (t.CivId == id || t.CivId == -1)))
+            {
+                foreach (var command in tech.Effect.Commands)
+                {
+                    if (command is DisableTechCommand dc)
+                    {
+                        set.Remove(dc.TechId);
+                    }
+                }
             }
 
             foreach (var techid in set)
@@ -117,6 +129,11 @@ namespace Compiler.Mods
         public BuildOrder GetBuildOrder(Unit unit, int iterations = 1000)
         {
             var bo = new BuildOrder(this, unit);
+            if (bo.Elements == null)
+            {
+                return null;
+            }
+
             bo.AddUpgrades();
             bo.AddEcoUpgrades();
             bo.Sort();
@@ -142,6 +159,9 @@ namespace Compiler.Mods
                     }
                 }
             });
+
+            bo.Sort();
+            bo.Sort();
 
             bo.InsertGatherers();
 

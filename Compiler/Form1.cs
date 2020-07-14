@@ -10,12 +10,19 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Windows.Forms;
+using static Compiler.CounterGenerator;
 using static Compiler.Lang.Statements;
 
 namespace Compiler
 {
     public partial class Form1 : Form
     {
+        private class Strategy
+        {
+            public readonly List<Counter> Counters = new List<Counter>();
+            public readonly Dictionary<Unit, BuildOrder> BuildOrders = new Dictionary<Unit, BuildOrder>();
+
+        }
         public Form1()
         {
             InitializeComponent();
@@ -30,7 +37,7 @@ namespace Compiler
 
             var settings = new Settings();
 
-            Log.Debug("setting build orders");
+            Log.Debug("creating strategies");
             SetBuildOrders(settings);
 
             Log.Debug("compiling");
@@ -46,6 +53,8 @@ namespace Compiler
 
         private void SetBuildOrders(Settings settings)
         {
+            var rng = new Random();
+
             var name = Directory.GetFiles(settings.SourceFolder).Single(f => Path.GetExtension(f) == ".ai");
             name = Path.GetFileNameWithoutExtension(name);
             var folder = Path.Combine(settings.SourceFolder, name);
@@ -54,36 +63,30 @@ namespace Compiler
                 Directory.CreateDirectory(folder);
             }
 
-            const int CIV = 11;
-            const int UNIT = 75;
-
             var mod = new Mod();
             mod.Load(settings.DatFile);
+            var enemies = mod.Civilizations.SelectMany(c => c.TrainableUnits).Where(u => u.Land && u.ClassId != 4).Distinct().ToList();
 
-            var sb = new StringBuilder();
+            var strategies = new Dictionary<Civilization, Strategy>();
 
-
-
-            var rng = new Random();
-
-            // add build orders
             foreach (var civ in mod.Civilizations.Where(c => c.Id != 0))
             {
                 Log.Debug("doing civ " + civ.Name + " " + civ.Id);
-                sb.AppendLine($"; ----- STARTING CIV {civ.Id} {civ.Name} -----");
-                sb.AppendLine("#if civ-selected " + civ.Id);
 
-                // TODO counters
-                //sb.AppendLine("sn-target = 75");
+                var strat = new Strategy();
 
                 var units = civ.TrainableUnits
                     .Where(u => u.Land)
                     .Select(u => u.BaseUnit)
+                    .Where(u => u.Available || u.TechRequired)
                     .Where(u => u.BuildLocation != null)
                     .Distinct()
                     .OrderBy(u => rng.Next())
                     .ToList();
 
+                var counters = new HashSet<Unit>();
+
+                // get build orders
                 foreach (var unit in units)
                 {
                     var current = unit;
@@ -107,44 +110,176 @@ namespace Compiler
                         continue;
                     }
 
-                    sb.AppendLine($"#if sn-strategy == OFF");
-                    sb.AppendLine($"    generate-random-number 100");
-                    sb.AppendLine("     #if random-number < 10");
-                    sb.AppendLine($"            sn-strategy = {current.Id}");
-                    sb.AppendLine("     #end-if");
-                    sb.AppendLine("#end-if");
-
-                    Log.Debug($"unit {current.Id} {current.Name} {current.GetAge(civ)}");
-                    sb.AppendLine($"; --- Going for {current.Id} {current.Name} ---");
-
-                    sb.AppendLine("#if sn-strategy == " + current.Id);
-
-                    try
+                    if (current.Id == 74)
                     {
-                        var bo = civ.GetBuildOrder(current, 100);
-                        if (bo.Elements.Count >= 99)
+                        Log.Debug("id 74 age " + current.GetAge(civ));
+                    }
+
+                    var bo = civ.GetBuildOrder(current, 100);
+                    if (bo == null)
+                    {
+                        continue;
+                    }
+
+                    if (bo.Elements.Count >= 99)
+                    {
+                        Log.Debug($"too many bo elements {civ.Name} {current.Id}");
+                        continue;
+                    }
+
+                    counters.Add(current);
+
+                    strat.BuildOrders.Add(current, bo);
+                    Log.Debug($"unit {current.Id} {current.Name}");
+                }
+
+                // get counters
+                foreach (var counter in counters.ToList())
+                {
+                    foreach (var upgr in counter.UpgradedFrom.Concat(counter.UpgradesTo))
+                    {
+                        if (upgr.GetAge(civ) >= 2)
                         {
-                            throw new Exception($"too many bo elements {civ.Name} {current.Id}");
+                            counters.Add(upgr);
                         }
-                        var cbo = bo.Compile();
+                    }
+                }
 
-                        sb.AppendLine(cbo);
-                    }
-                    catch (Exception e)
+                var cgen = new CounterGenerator(civ);
+                var cs = cgen.GetCounters(enemies, counters.ToList());
+                var baseunits = new HashSet<Unit>();
+                foreach (var unit in cs.Select(c => c.EnemyUnit))
+                {
+                    baseunits.Add(unit.BaseUnit);
+                }
+
+                foreach (var counter in cs.Where(c => baseunits.Contains(c.EnemyUnit)))
+                {
+                    if (strat.BuildOrders.ContainsKey(counter.CounterUnit))
                     {
-                        Log.Debug($"error civ {civ.Name} unit {current.Id}: " + e.Message + "\n" + e.StackTrace);
+                        strat.Counters.Add(counter);
                     }
+                    else
+                    {
+                        foreach (var upgr in counter.CounterUnit.UpgradedFrom)
+                        {
+                            if (strat.BuildOrders.ContainsKey(upgr))
+                            {
+                                strat.Counters.Add(new Counter(counter.EnemyUnit, counter.Age, upgr));
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                foreach (var counter in strat.Counters)
+                {
+                    Log.Debug($"counter {counter.EnemyUnit.Id} {counter.EnemyUnit.Name} in age {counter.Age} with {counter.CounterUnit.Id} {counter.CounterUnit.Name}");
+                }
+
+                strategies.Add(civ, strat);
+            }
+
+            var sb = new StringBuilder();
+
+            sb.AppendLine(";---- Auto generated ----");
+            sb.AppendLine("");
+
+            sb.AppendLine(";region Auto Counters");
+            sb.AppendLine("var gl-target-count = 0");
+            sb.AppendLine("var gl-current-count = 0");
+
+            foreach (var unit in enemies.OrderBy(u => u.Id))
+            {
+                sb.AppendLine("(defrule");
+                sb.AppendLine($"\t(strategic-number sn-auto-counters == YES)");
+                sb.AppendLine("=>");
+                sb.AppendLine($"\t(up-get-target-fact unit-type-count {unit.Id} gl-current-count)");
+                sb.AppendLine(")");
+
+                sb.AppendLine("(defrule");
+                sb.AppendLine($"\t(strategic-number sn-auto-counters == YES)");
+                sb.AppendLine($"\t(up-compare-goal gl-current-count g:> gl-target-count)");
+                sb.AppendLine($"\t(up-compare-goal gl-current-count c:>= 3)");
+                sb.AppendLine("=>");
+                sb.AppendLine($"\t(set-strategic-number sn-target-unit {unit.BaseUnit.Id})");
+                sb.AppendLine($"\t(up-modify-goal gl-target-count g:== gl-current-count)");
+                sb.AppendLine(")");
+            }
+
+            sb.AppendLine(";endregion");
+
+            foreach (var civ in strategies.Keys)
+            {
+                sb.AppendLine($"; ----- STARTING CIV {civ.Id} {civ.Name} -----");
+                sb.AppendLine(";region " + civ.Name);
+
+                sb.AppendLine("#if civ-selected " + civ.Id);
+
+                var strat = strategies[civ];
+
+                // write counters
+                foreach (var counter in strat.Counters)
+                {
+                    var age = civ.Age1Tech.Id;
+                    if (counter.Age == 2)
+                    {
+                        age = civ.Age2Tech.Id;
+                    }
+                    if (counter.Age == 3)
+                    {
+                        age = civ.Age3Tech.Id;
+                    }
+                    if (counter.Age == 4)
+                    {
+                        age = civ.Age4Tech.Id;
+                    }
+
+                    sb.AppendLine($"(defrule");
+                    sb.AppendLine($"\t(civ-selected {civ.Id})");
+                    sb.AppendLine($"\t(strategic-number sn-target-unit == {counter.EnemyUnit.Id})");
+                    sb.AppendLine($"\t(current-age == {age})");
+                    sb.AppendLine($"=>");
+                    sb.AppendLine($"\t(set-strategic-number sn-strategy {counter.CounterUnit.Id})");
+                    sb.AppendLine($")");
+                    sb.AppendLine("");
+                }
+
+                // write build orders
+                foreach (var unit in strat.BuildOrders.Keys)
+                {
+                    var bo = strat.BuildOrders[unit];
+
+                    var cbo = bo.Compile();
+
+                    sb.AppendLine($"; --- Going for {unit.Id} {unit.Name} ---");
+
+                    sb.AppendLine("#if sn-strategy == " + unit.Id);
+
+                    sb.AppendLine(cbo);
 
                     sb.AppendLine("#end-if");
                 }
 
+                // set initial bo
+                foreach (var unit in strat.BuildOrders.Keys.Where(u => u.GetAge(civ) == 2))
+                {
+                    sb.AppendLine($"#if sn-strategy == OFF");
+                    sb.AppendLine($"    generate-random-number 100");
+                    sb.AppendLine("     #if random-number < 30");
+                    sb.AppendLine($"            sn-strategy = {unit.Id}");
+                    sb.AppendLine("     #end-if");
+                    sb.AppendLine("#end-if");
+                }
+
                 sb.AppendLine("#if sn-strategy == OFF");
-                sb.AppendLine("sn-strategy = 75");
+                sb.AppendLine(" sn-strategy = 75");
                 sb.AppendLine("#end-if");
 
                 sb.AppendLine("#end-if");
+                sb.AppendLine(";endregion");
             }
-            
+
             var file = Path.Combine(folder, "Strategies.per");
             File.WriteAllText(file, sb.ToString());
         }

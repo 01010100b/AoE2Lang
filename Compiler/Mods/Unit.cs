@@ -5,6 +5,7 @@ using System.Security.AccessControl;
 using System.Text;
 using System.Threading.Tasks;
 using YTY.AocDatLib;
+using static Compiler.Mods.UnitStats;
 
 namespace Compiler.Mods
 {
@@ -31,7 +32,14 @@ namespace Compiler.Mods
         public Unit PileUnit { get; internal set; } = null;
         public Unit DropSite { get; internal set; } = null;
 
+        public readonly int BaseHitpoints;
+        public readonly int BaseRange;
+        public readonly List<ArmorValue> BaseArmors;
+        public readonly List<ArmorValue> BaseAttacks;
+        public readonly double BaseReloadTime;
+
         public readonly List<UnitCommand> Commands = new List<UnitCommand>();
+        public Cost BaseCost => new Cost(FoodCost, WoodCost, GoldCost, StoneCost);
 
         private readonly int FoodCost;
         private readonly int WoodCost;
@@ -44,7 +52,21 @@ namespace Compiler.Mods
             Name = new string(Encoding.ASCII.GetChars(unit.Name).Where(c => char.IsLetterOrDigit(c)).ToArray());
             Type = unit.Type;
             ClassId = unit.UnitClass;
-            
+
+            BaseHitpoints = unit.HitPoints;
+            BaseRange = Math.Max(1, (int)unit.MaxRange);
+            BaseArmors = new List<ArmorValue>();
+            if (unit.Armors != null)
+            {
+                BaseArmors.AddRange(unit.Armors.Select(a => new ArmorValue(a.Id, a.Amount)));
+            }
+            BaseAttacks = new List<ArmorValue>();
+            if (unit.Attacks != null)
+            {
+                BaseAttacks.AddRange(unit.Attacks.Select(a => new ArmorValue(a.Id, a.Amount)));
+            }
+
+            BaseReloadTime = unit.ReloadTime;
 
             if (unit.TerrainRestriction == 4 || unit.TerrainRestriction == 7)
             {
@@ -139,21 +161,11 @@ namespace Compiler.Mods
             return new Cost(FoodCost, WoodCost, GoldCost, StoneCost);
         }
 
-        public UnitStats GetStats(List<Effect> effects)
-        {
-            return new UnitStats(new Cost(FoodCost, WoodCost, GoldCost, StoneCost));
-        }
-
         public int GetAge(Civilization civilization)
         {
-            BuildOrder bo;
-            try
+            var bo = new BuildOrder(civilization, this);
+            if (bo.Elements == null)
             {
-                bo = new BuildOrder(civilization, this);
-            }
-            catch (Exception e)
-            {
-                Log.Debug($"no bo for {Id}");
                 return -1;
             }
 

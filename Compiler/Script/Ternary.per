@@ -17,6 +17,7 @@
 (defconst civilian-unit villager)
 (defconst housing-unit house)
 (defconst food-generating-unit farm)
+(defconst trading-building market)
 
 #defglobal gl-with-escrow = with-escrow
 #defglobal gl-without-escrow = without-escrow
@@ -47,6 +48,8 @@
 #defstrategic sn-percentage-extra-gold = 0; same for gold
 #defstrategic sn-percentage-extra-stone = 0; same for stone
 
+#defstrategic sn-target-unit = OFF
+#defstrategic sn-auto-counters = YES
 #defstrategic sn-strategy = OFF
 #defstrategic sn-primary-unit = OFF;
 #defstrategic sn-secondary-unit = OFF;
@@ -103,12 +106,24 @@
 	
 #end-if
 
+; set target player
+var gl-target
+up-find-player enemy find-closest gl-target
+sn-target-player-number = gl-target
+
 ;endregion
 
 ;region Build Order execution
 
 #if timer-triggered ti-repeat-23
 
+	#if sn-target-unit != OFF
+	
+		up-store-type-name s: sn-target-unit
+		up-chat-data-to-self "Being attacked by %s" c: 7031232
+		
+	#end-if
+	
 	up-store-type-name s: sn-strategy
 	up-chat-data-to-self "Going for %s" c: 7031232
 	
@@ -450,6 +465,46 @@ gl-mill max= 1
 	#end-if
 
 #end-foreach
+
+#foreach $resource in food wood stone
+
+	#if $resource-amount > 2000
+	
+		#if (building-type-count-total trading-building == 0) (can-build-with-escrow trading-building)
+		
+			up-build place-normal gl-with-escrow c: trading-building
+			
+		#end-if
+		
+		#if can-sell-commodity $resource
+		
+			sell-commodity $resource
+			
+		#end-if
+		
+	#end-if
+	
+#end-foreach
+
+#if gold-amount > 2000
+
+	#if (building-type-count-total trading-building == 0) (can-build-with-escrow trading-building)
+		
+		up-build place-normal gl-with-escrow c: trading-building
+			
+	#end-if
+	
+	#foreach $resource in food wood stone
+	
+		#if ($resource-amount < 500) (can-buy-commodity $resource)
+		
+			buy-commodity $resource
+			
+		#end-if
+		
+	#end-foreach
+	
+#end-if
 
 ;endregion
 
