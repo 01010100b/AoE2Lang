@@ -211,14 +211,16 @@ namespace Compiler
 
             foreach (var civ in strategies.Keys)
             {
-                sb.AppendLine($"; ----- STARTING CIV {civ.Id} {civ.Name} -----");
+                sb.AppendLine($"; ------ STARTING CIV {civ.Id} {civ.Name} ------");
                 sb.AppendLine(";region " + civ.Name);
 
                 sb.AppendLine("#if civ-selected " + civ.Id);
 
                 var strat = strategies[civ];
 
+
                 // write counters
+                sb.AppendLine(";region ---- Counters");
                 foreach (var counter in strat.Counters)
                 {
                     var age = civ.Age1Tech.Id;
@@ -235,6 +237,7 @@ namespace Compiler
                         age = civ.Age4Tech.Id;
                     }
 
+                    sb.AppendLine($";counter {counter.EnemyUnit.Id} {counter.EnemyUnit.Name} with {counter.CounterUnit.Id} {counter.CounterUnit.Name} in age {age}");
                     sb.AppendLine($"(defrule");
                     sb.AppendLine($"\t(civ-selected {civ.Id})");
                     sb.AppendLine($"\t(strategic-number sn-target-unit == {counter.EnemyUnit.Id})");
@@ -245,14 +248,17 @@ namespace Compiler
                     sb.AppendLine("");
                 }
 
+                sb.AppendLine(";endregion");
+
                 // write build orders
+                sb.AppendLine(";region ---- Build Orders");
                 foreach (var unit in strat.BuildOrders.Keys)
                 {
                     var bo = strat.BuildOrders[unit];
 
                     var cbo = bo.Compile();
 
-                    sb.AppendLine($"; --- Going for {unit.Id} {unit.Name} ---");
+                    sb.AppendLine($"; -- Build order for {unit.Id} {unit.Name}");
 
                     sb.AppendLine("#if sn-strategy == " + unit.Id);
 
@@ -260,8 +266,10 @@ namespace Compiler
 
                     sb.AppendLine("#end-if");
                 }
+                sb.AppendLine(";endregion");
 
                 // set initial bo
+                sb.AppendLine("; choose initial bo");
                 foreach (var unit in strat.BuildOrders.Keys.Where(u => u.GetAge(civ) == 2))
                 {
                     sb.AppendLine($"#if sn-strategy == OFF");
