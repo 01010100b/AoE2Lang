@@ -11,9 +11,9 @@ using System.Threading.Tasks;
 
 namespace Compiler.Mods
 {
-    class BuildOrder
+    class OldBuildOrder
     {
-        public struct BuildElement
+        public struct OldBuildElement
         {
             public readonly bool Research;
             public readonly Unit Unit;
@@ -27,7 +27,7 @@ namespace Compiler.Mods
 
             public bool Buildable => Research == false || (Technology.Free == false && Technology.ResearchLocation != null);
 
-            public BuildElement(bool research, Unit unit, Technology technology)
+            public OldBuildElement(bool research, Unit unit, Technology technology)
             {
                 Research = research;
                 Unit = unit;
@@ -39,7 +39,7 @@ namespace Compiler.Mods
                 StoneGatherers = 0;
             }
 
-            public BuildElement(int food, int wood, int gold, int stone)
+            public OldBuildElement(int food, int wood, int gold, int stone)
             {
                 Research = false;
                 Unit = null;
@@ -79,7 +79,7 @@ namespace Compiler.Mods
 
             public override bool Equals(object obj)
             {
-                if (obj is BuildElement other)
+                if (obj is OldBuildElement other)
                 {
                     return (Research == other.Research) && (Unit == other.Unit) && (Technology == other.Technology)
                         && (Gatherers == other.Gatherers) && (FoodGatherers == other.FoodGatherers)
@@ -97,12 +97,12 @@ namespace Compiler.Mods
                 return base.GetHashCode();
             }
 
-            public static bool operator ==(BuildElement a, BuildElement b)
+            public static bool operator ==(OldBuildElement a, OldBuildElement b)
             {
                 return a.Equals(b);
             }
 
-            public static bool operator !=(BuildElement a, BuildElement b)
+            public static bool operator !=(OldBuildElement a, OldBuildElement b)
             {
                 return !a.Equals(b);
             }
@@ -110,19 +110,19 @@ namespace Compiler.Mods
 
         public readonly Civilization Civilization;
         public readonly Unit Unit;
-        public readonly List<BuildElement> Elements;
+        public readonly List<OldBuildElement> Elements;
         public Cost Cost => GetCost();
         public double Score => GetScore();
 
         private readonly HashSet<Unit> SearchingUnits;
         private readonly HashSet<Technology> SearchingTechs;
-        private readonly Dictionary<Unit, List<BuildElement>> KnownUnits;
-        private readonly Dictionary<Technology, List<BuildElement>> KnownTechnologies;
+        private readonly Dictionary<Unit, List<OldBuildElement>> KnownUnits;
+        private readonly Dictionary<Technology, List<OldBuildElement>> KnownTechnologies;
         private readonly List<Unit> AvailableUnits;
 
         private readonly Random Random;
 
-        internal BuildOrder(Civilization civilization, Unit unit, bool water = false, int seed = -1)
+        internal OldBuildOrder(Civilization civilization, Unit unit, bool water = false, int seed = -1)
         {
             Random = new Random();
             if (seed >= 0)
@@ -135,8 +135,8 @@ namespace Compiler.Mods
 
             SearchingUnits = new HashSet<Unit>();
             SearchingTechs = new HashSet<Technology>();
-            KnownUnits = new Dictionary<Unit, List<BuildElement>>();
-            KnownTechnologies = new Dictionary<Technology, List<BuildElement>>();
+            KnownUnits = new Dictionary<Unit, List<OldBuildElement>>();
+            KnownTechnologies = new Dictionary<Technology, List<OldBuildElement>>();
             AvailableUnits = Civilization.AvailableUnits.Where(u => u.Land).ToList();
 
             var bo = GetUnit(unit);
@@ -151,12 +151,12 @@ namespace Compiler.Mods
             }
         }
 
-        public List<BuildElement> GetTechPartial(Technology tech)
+        public List<OldBuildElement> GetTechPartial(Technology tech)
         {
             return KnownTechnologies[tech];
         }
 
-        public List<BuildElement> GetUnitPartial(Unit unit)
+        public List<OldBuildElement> GetUnitPartial(Unit unit)
         {
             return KnownUnits[unit];
         }
@@ -255,13 +255,13 @@ namespace Compiler.Mods
                 throw new Exception("can't sort with gatherer commands");
             }
 
-            var sorts = new List<KeyValuePair<BuildElement, double>>();
+            var sorts = new List<KeyValuePair<OldBuildElement, double>>();
             foreach (var be in Elements)
             {
-                sorts.Add(new KeyValuePair<BuildElement, double>(be, GetPriority(be)));
+                sorts.Add(new KeyValuePair<OldBuildElement, double>(be, GetPriority(be)));
             }
 
-            var set = new HashSet<BuildElement>();
+            var set = new HashSet<OldBuildElement>();
             for (int i = 0; i < sorts.Count; i++)
             {
                 var current = sorts[i];
@@ -308,9 +308,9 @@ namespace Compiler.Mods
             Elements.AddRange(sorts.Select(s => s.Key));
         }
 
-        public void Sort(Func<BuildElement, bool> predicate)
+        public void Sort(Func<OldBuildElement, bool> predicate)
         {
-            var set = new HashSet<BuildElement>();
+            var set = new HashSet<OldBuildElement>();
             var age2 = -1;
             for (int i = 0; i < Elements.Count; i++)
             {
@@ -441,7 +441,7 @@ namespace Compiler.Mods
                 if (age)
                 {
                     var sum = cost.Total;
-                    var gatherers = new BuildElement(100 * cost.Food / sum, 100 * cost.Wood / sum, 100 * cost.Gold / sum, 100 * cost.Stone / sum);
+                    var gatherers = new OldBuildElement(100 * cost.Food / sum, 100 * cost.Wood / sum, 100 * cost.Gold / sum, 100 * cost.Stone / sum);
                     Elements.Insert(start, gatherers);
 
                     cost = new Cost();
@@ -453,7 +453,7 @@ namespace Compiler.Mods
 
             var ucost = Unit.GetCost(Civilization);
             var s = ucost.Total;
-            var gath = new BuildElement(100 * ucost.Food / s, 100 * ucost.Wood / s, 100 * ucost.Gold / s, 100 * ucost.Stone / s);
+            var gath = new OldBuildElement(100 * ucost.Food / s, 100 * ucost.Wood / s, 100 * ucost.Gold / s, 100 * ucost.Stone / s);
 
             Elements.Add(gath);
         }
@@ -521,7 +521,7 @@ namespace Compiler.Mods
             return sb.ToString();
         }
 
-        private List<BuildElement> GetUnit(Unit unit)
+        private List<OldBuildElement> GetUnit(Unit unit)
         {
             const int TRACK = -1;
 
@@ -532,12 +532,12 @@ namespace Compiler.Mods
 
             if (Civilization.ExtraUnits.Contains(unit))
             {
-                return new List<BuildElement>();
+                return new List<OldBuildElement>();
             }
 
             if (unit.Id == 109)
             {
-                return new List<BuildElement>();
+                return new List<OldBuildElement>();
             }
 
             if (KnownUnits.ContainsKey(unit))
@@ -552,7 +552,7 @@ namespace Compiler.Mods
                 Debug.WriteLine("getting unit 1");
             }
 
-            var bo = new List<BuildElement>();
+            var bo = new List<OldBuildElement>();
 
             // train site
             if (unit.BuildLocation != null)
@@ -586,7 +586,7 @@ namespace Compiler.Mods
                                 if (b != null)
                                 {
                                     bo.AddRange(b);
-                                    bo.Add(new BuildElement(false, unit, null));
+                                    bo.Add(new OldBuildElement(false, unit, null));
                                     SearchingUnits.Remove(unit);
                                     KnownUnits.Add(unit, bo);
 
@@ -603,7 +603,7 @@ namespace Compiler.Mods
                                 if (b != null)
                                 {
                                     bo.AddRange(b);
-                                    bo.Add(new BuildElement(false, unit, null));
+                                    bo.Add(new OldBuildElement(false, unit, null));
 
                                     SearchingUnits.Remove(unit);
                                     KnownUnits.Add(unit, bo);
@@ -624,7 +624,7 @@ namespace Compiler.Mods
                 return null;
             }
 
-            bo.Add(new BuildElement(false, unit, null));
+            bo.Add(new OldBuildElement(false, unit, null));
 
             SearchingUnits.Remove(unit);
             KnownUnits.Add(unit, bo);
@@ -632,7 +632,7 @@ namespace Compiler.Mods
             return bo;
         }
 
-        private List<BuildElement> GetTech(Technology tech)
+        private List<OldBuildElement> GetTech(Technology tech)
         {
             const int TRACK = -1;
 
@@ -643,7 +643,7 @@ namespace Compiler.Mods
 
             if (tech == Civilization.Age1Tech)
             {
-                return new List<BuildElement>();
+                return new List<OldBuildElement>();
             }
 
             if (KnownTechnologies.ContainsKey(tech))
@@ -661,7 +661,7 @@ namespace Compiler.Mods
                 Debug.WriteLine("getting tech 1");
             }
 
-            var bo = new List<BuildElement>();
+            var bo = new List<OldBuildElement>();
 
             var prereqs = new List<Technology>();
             foreach (var prereq in tech.Prerequisites)
@@ -708,7 +708,7 @@ namespace Compiler.Mods
                     Debug.WriteLine("getting tech 3");
                 }
 
-                List<BuildElement> b = null;
+                List<OldBuildElement> b = null;
                 foreach (var unit in AvailableUnits.Where(u => u.TechInitiated == tech))
                 {
                     if (tech.Id == TRACK)
@@ -747,7 +747,7 @@ namespace Compiler.Mods
                 bo.AddRange(b);
             }
 
-            bo.Add(new BuildElement(true, null, tech));
+            bo.Add(new OldBuildElement(true, null, tech));
 
             SearchingTechs.Remove(tech);
             KnownTechnologies.Add(tech, bo);
@@ -792,7 +792,7 @@ namespace Compiler.Mods
             return 1 / score;
         }
 
-        private int GetPriority(BuildElement be)
+        private int GetPriority(OldBuildElement be)
         {
             if (be.Gatherers)
             {

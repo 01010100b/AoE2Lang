@@ -93,9 +93,9 @@
 	(set-strategic-number sn-mill-max-distance 25)
 	(set-strategic-number sn-maximum-hunt-drop-distance 25)
 	(set-strategic-number sn-maximum-food-drop-distance 7)
-	(set-strategic-number sn-maximum-wood-drop-distance 7)
-	(set-strategic-number sn-maximum-gold-drop-distance 7)
-	(set-strategic-number sn-maximum-stone-drop-distance 7)
+	(set-strategic-number sn-maximum-wood-drop-distance 50)
+	(set-strategic-number sn-maximum-gold-drop-distance 50)
+	(set-strategic-number sn-maximum-stone-drop-distance 50)
 	(disable-self)
 )
 
@@ -371,6 +371,50 @@ gl-cost-stone max= 100
 	
 #end-if
 
+gl-cost-food max= 500
+gl-cost-wood max= 500
+gl-cost-stone max= 500
+
+#if gold-amount > 2000
+
+	#if (building-type-count-total trading-building == 0) (can-build-with-escrow trading-building)
+		
+		up-build place-normal gl-with-escrow c: trading-building
+			
+	#end-if
+	
+	#foreach $resource in food wood stone
+	
+		#if (up-resource-amount amount-$resource g:< gl-cost-$resource) (can-buy-commodity $resource)
+		
+			buy-commodity $resource
+			
+		#end-if
+		
+	#end-foreach
+	
+#end-if
+
+#foreach $resource in food wood stone
+
+	#if $resource-amount > 2000
+	
+		#if (building-type-count-total trading-building == 0) (can-build-with-escrow trading-building)
+		
+			up-build place-normal gl-with-escrow c: trading-building
+			
+		#end-if
+		
+		#if can-sell-commodity $resource
+		
+			sell-commodity $resource
+			
+		#end-if
+		
+	#end-if
+	
+#end-foreach
+
 ;endregion
 
 ;region Eco
@@ -457,6 +501,12 @@ gl-mill max= 1
 
 	#if (resource-found $resource) (dropsite-min-distance $resource > 2) (sn-$resource-gatherer-percentage > 0)
 	
+		#if (timer-triggered ti-repeat-1m)
+		
+			sn-camp-max-distance += 1
+		
+		#end-if
+		
 		#if (can-build-with-escrow $resource-dropsite) (or (building-type-count $resource-dropsite > 0) (game-time > 300))
 		
 			up-build place-normal gl-with-escrow c: $resource-dropsite
@@ -467,46 +517,6 @@ gl-mill max= 1
 	#end-if
 
 #end-foreach
-
-#foreach $resource in food wood stone
-
-	#if $resource-amount > 2000
-	
-		#if (building-type-count-total trading-building == 0) (can-build-with-escrow trading-building)
-		
-			up-build place-normal gl-with-escrow c: trading-building
-			
-		#end-if
-		
-		#if can-sell-commodity $resource
-		
-			sell-commodity $resource
-			
-		#end-if
-		
-	#end-if
-	
-#end-foreach
-
-#if gold-amount > 2000
-
-	#if (building-type-count-total trading-building == 0) (can-build-with-escrow trading-building)
-		
-		up-build place-normal gl-with-escrow c: trading-building
-			
-	#end-if
-	
-	#foreach $resource in food wood stone
-	
-		#if ($resource-amount < 500) (can-buy-commodity $resource)
-		
-			buy-commodity $resource
-			
-		#end-if
-		
-	#end-foreach
-	
-#end-if
 
 ;endregion
 

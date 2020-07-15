@@ -6,7 +6,7 @@ using System.Security.Policy;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using static Compiler.Mods.BuildOrder;
+using static Compiler.Mods.OldBuildOrder;
 
 namespace Compiler.Mods
 {
@@ -24,7 +24,7 @@ namespace Compiler.Mods
         public Technology Age3Tech => Technologies.Single(t => t.Id == (int)Resources[Resource.Age3Tech]);
         public Technology Age4Tech => Technologies.Single(t => t.Id == (int)Resources[Resource.Age4Tech]);
         public List<Unit> AvailableUnits => Units.Where(u => u.Available || u.TechRequired).ToList();
-        public List<Unit> TrainableUnits => AvailableUnits.Where(u => u.BuildLocation != null && new BuildOrder(this, u).Elements != null).ToList();
+        public List<Unit> TrainableUnits => AvailableUnits.Where(u => u.BuildLocation != null && new OldBuildOrder(this, u).Elements != null).ToList();
 
         public Civilization(int id, YTY.AocDatLib.Civilization civilization, Mod mod)
         {
@@ -126,9 +126,9 @@ namespace Compiler.Mods
             }
         }
 
-        public BuildOrder GetBuildOrder(Unit unit, int iterations = 1000)
+        public OldBuildOrder GetBuildOrder(Unit unit, int iterations = 1000)
         {
-            var bo = new BuildOrder(this, unit);
+            var bo = new OldBuildOrder(this, unit);
             if (bo.Elements == null)
             {
                 return null;
@@ -147,7 +147,7 @@ namespace Compiler.Mods
                     seed = Math.Abs(rng.Next() ^ rng.Next() ^ rng.Next());
                 }
 
-                var nbo = new BuildOrder(this, unit, false, seed);
+                var nbo = new OldBuildOrder(this, unit, false, seed);
                 nbo.AddUpgrades();
                 nbo.AddEcoUpgrades();
                 nbo.Sort();

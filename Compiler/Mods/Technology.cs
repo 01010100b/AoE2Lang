@@ -72,5 +72,10 @@ namespace Compiler.Mods
         {
             return new Cost(FoodCost, WoodCost, GoldCost, StoneCost);
         }
+
+        public Cost GetCost(List<Effect> effects)
+        {
+            return new Cost(FoodCost, WoodCost, GoldCost, StoneCost);
+        }
     }
 }

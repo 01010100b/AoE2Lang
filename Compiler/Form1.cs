@@ -20,7 +20,7 @@ namespace Compiler
         private class Strategy
         {
             public readonly List<Counter> Counters = new List<Counter>();
-            public readonly Dictionary<Unit, BuildOrder> BuildOrders = new Dictionary<Unit, BuildOrder>();
+            public readonly Dictionary<Unit, OldBuildOrder> BuildOrders = new Dictionary<Unit, OldBuildOrder>();
 
         }
         public Form1()

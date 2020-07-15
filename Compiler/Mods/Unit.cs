@@ -163,7 +163,7 @@ namespace Compiler.Mods
 
         public int GetAge(Civilization civilization)
         {
-            var bo = new BuildOrder(civilization, this);
+            var bo = new OldBuildOrder(civilization, this);
             if (bo.Elements == null)
             {
                 return -1;

@@ -25,6 +25,8 @@ namespace Compiler
 
         public readonly Civilization Civilization;
 
+        private readonly Dictionary<Unit, UnitStats> UnitStats = new Dictionary<Unit, UnitStats>();
+
         public CounterGenerator(Civilization civilization)
         {
             Civilization = civilization;
@@ -32,6 +34,12 @@ namespace Compiler
 
         public List<Counter> GetCounters(List<Unit> enemies, List<Unit> counters)
         {
+            UnitStats.Clear();
+            foreach (var unit in enemies.Concat(counters))
+            {
+                UnitStats[unit] = new UnitStats(unit, null);
+            }
+
             var results = new List<Counter>();
 
             var counters_by_age = new Dictionary<int, List<Unit>>();
@@ -43,7 +51,7 @@ namespace Compiler
                 }
             }
 
-            foreach (var counter in counters)
+            foreach (var counter in counters.Where(u => u.ClassId != 35))
             {
                 counters_by_age[counter.GetAge(Civilization)].Add(counter);
             }
@@ -80,8 +88,8 @@ namespace Compiler
 
         private double GetScore(Unit enemy, Unit counter)
         {
-            var enemystats = new UnitStats(enemy, null);
-            var counterstats = new UnitStats(counter, null);
+            var enemystats = UnitStats[enemy];
+            var counterstats = UnitStats[counter];
             
             var attackenemy = 0d;
             foreach (var attack in enemystats.Attacks)
@@ -90,10 +98,11 @@ namespace Compiler
                 {
                     if (attack.Id == armor.Id)
                     {
-                        attackenemy += Math.Max(0, Math.Min(1, attack.Amount - armor.Amount));
+                        attackenemy += Math.Max(0, attack.Amount - armor.Amount);
                     }
                 }
             }
+            attackenemy = Math.Max(1, attackenemy);
             
             var attackcounter = 0d;
             foreach (var attack in counterstats.Attacks)
@@ -102,22 +111,23 @@ namespace Compiler
                 {
                     if (attack.Id == armor.Id)
                     {
-                        attackcounter += Math.Max(0, Math.Min(1, attack.Amount - armor.Amount));
+                        attackcounter += Math.Max(0, attack.Amount - armor.Amount);
                     }
                 }
             }
+            attackcounter = Math.Max(1, attackcounter);
 
-            var cost = counterstats.Cost.Total;
-            if (counter.GetAge(Civilization) == 4)
-            {
-                cost += counterstats.Cost.Gold;
-            }
-
-            var enemyscore = Math.Ceiling(counterstats.Hitpoints / attackenemy) * enemystats.ReloadTime * enemystats.Cost.Total;
-            var counterscore = Math.Ceiling(enemystats.Hitpoints / attackcounter) * counterstats.ReloadTime * cost;
+            var enemyscore = Math.Ceiling(counterstats.Hitpoints / attackenemy) * enemystats.ReloadTime;
+            var counterscore = Math.Ceiling(enemystats.Hitpoints / attackcounter) * counterstats.ReloadTime;
 
             enemyscore = 1d / Math.Max(1, enemyscore);
             counterscore = 1d / Math.Max(1, counterscore);
+
+            var exp = enemystats.Range > 2 ? 1.9 : 1.6;
+            enemyscore *= Math.Pow(1000d / enemystats.Cost.Total, exp);
+            
+            exp = counterstats.Range > 2 ? 1.9 : 1.6;
+            counterscore *= Math.Pow(1000d / counterstats.Cost.Total, exp);
 
             return counterscore - enemyscore;
         }
