@@ -170,7 +170,7 @@ namespace Compiler.Mods
                 {
                     if (command is AttributeModifierCommand ac)
                     {
-                        if (ac.UnitId == Unit.Id || ac.ClassId == Unit.ClassId)
+                        if (ac.UnitId == Unit.Id || ac.ClassId == Unit.Class)
                         {
                             var bo = GetTech(tech);
                             if (bo != null)
@@ -221,7 +221,7 @@ namespace Compiler.Mods
 
         public void AddEcoUpgrades()
         {
-            var vills = Civilization.Units.Where(u => u.ClassId == 4).ToList();
+            var vills = Civilization.Units.Where(u => u.Class == UnitClass.Civilian).ToList();
 
             foreach (var tech in Civilization.Technologies.Where(t => t.Effect != null))
             {
@@ -230,7 +230,7 @@ namespace Compiler.Mods
                     if (command is AttributeModifierCommand ac)
                     {
                         var unit = vills.FirstOrDefault(u => u.Id == ac.UnitId);
-                        if (unit != null || ac.ClassId == 4)
+                        if (unit != null || ac.ClassId == UnitClass.Civilian)
                         {
                             if (true)
                             {
@@ -528,11 +528,6 @@ namespace Compiler.Mods
             if (SearchingUnits.Contains(unit))
             {
                 return null;
-            }
-
-            if (Civilization.ExtraUnits.Contains(unit))
-            {
-                return new List<OldBuildElement>();
             }
 
             if (unit.Id == 109)

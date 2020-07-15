@@ -184,7 +184,7 @@ namespace Compiler.Mods
                     {
                         if (ac.Attribute == Attribute.CarryCapacity)
                         {
-                            if (ac.ClassId == 4)
+                            if (ac.ClassId == UnitClass.Civilian)
                             {
                                 tech.ResourceImproved = Resource.Food;
                                 break;

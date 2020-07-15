@@ -29,6 +29,7 @@
         private void InitializeComponent()
         {
             this.ButtonCompile = new System.Windows.Forms.Button();
+            this.ButtonTest = new System.Windows.Forms.Button();
             this.SuspendLayout();
             // 
             // ButtonCompile
@@ -37,15 +38,26 @@
             this.ButtonCompile.Name = "ButtonCompile";
             this.ButtonCompile.Size = new System.Drawing.Size(254, 58);
             this.ButtonCompile.TabIndex = 0;
-            this.ButtonCompile.Text = "button1";
+            this.ButtonCompile.Text = "Compile";
             this.ButtonCompile.UseVisualStyleBackColor = true;
             this.ButtonCompile.Click += new System.EventHandler(this.ButtonCompile_Click);
+            // 
+            // ButtonTest
+            // 
+            this.ButtonTest.Location = new System.Drawing.Point(70, 166);
+            this.ButtonTest.Name = "ButtonTest";
+            this.ButtonTest.Size = new System.Drawing.Size(254, 58);
+            this.ButtonTest.TabIndex = 1;
+            this.ButtonTest.Text = "Test";
+            this.ButtonTest.UseVisualStyleBackColor = true;
+            this.ButtonTest.Click += new System.EventHandler(this.ButtonTest_Click);
             // 
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(800, 450);
+            this.Controls.Add(this.ButtonTest);
             this.Controls.Add(this.ButtonCompile);
             this.Name = "Form1";
             this.Text = "Form1";
@@ -56,6 +68,7 @@
         #endregion
 
         private System.Windows.Forms.Button ButtonCompile;
+        private System.Windows.Forms.Button ButtonTest;
     }
 }
 

@@ -16,7 +16,6 @@ namespace Compiler.Mods
         public readonly string Name;
         public readonly List<Technology> Technologies = new List<Technology>();
         public readonly List<Unit> Units = new List<Unit>();
-        public readonly List<Unit> ExtraUnits = new List<Unit>();
         public readonly Dictionary<Resource, float> Resources = new Dictionary<Resource, float>();
 
         public Technology Age1Tech => Technologies.Single(t => t.Id == (int)Resources[Resource.Age1Tech]);
@@ -99,24 +98,6 @@ namespace Compiler.Mods
                 if (set.Contains(unit.Id))
                 {
                     Units.Add(unit);
-                }
-            }
-
-            // fix tc not available
-            foreach (var unit in mod.Units)
-            {
-                if (!set.Contains(unit.Id))
-                {
-                    var name = unit.Name;
-                    foreach (var other in Units)
-                    {
-                        if (other.Name.StartsWith(name))
-                        {
-                            Units.Add(unit);
-                            ExtraUnits.Add(unit);
-                            break;
-                        }
-                    }
                 }
             }
 

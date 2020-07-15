@@ -65,7 +65,7 @@ namespace Compiler
 
             var mod = new Mod();
             mod.Load(settings.DatFile);
-            var enemies = mod.Civilizations.SelectMany(c => c.TrainableUnits).Where(u => u.Land && u.ClassId != 4).Distinct().ToList();
+            var enemies = mod.Civilizations.SelectMany(c => c.TrainableUnits).Where(u => u.Land && u.Class != UnitClass.Civilian).Distinct().ToList();
 
             var strategies = new Dictionary<Civilization, Strategy>();
 
@@ -109,6 +109,8 @@ namespace Compiler
                     {
                         continue;
                     }
+
+                    
 
                     if (current.Id == 74)
                     {
@@ -347,6 +349,99 @@ namespace Compiler
                     queue.Enqueue(dir);
                 }
             }
+        }
+
+        private void ButtonTest_Click(object sender, EventArgs e)
+        {
+            var sw = new Stopwatch();
+            sw.Start();
+
+            var settings = new Settings();
+            var mod = new Mod();
+            mod.Load(settings.DatFile);
+
+            foreach (var civ in mod.Civilizations.Where(c => c.Id > 0))
+            {
+                Log.Debug($"---- {civ.Id} {civ.Name} ----");
+
+                var units = civ.Units
+                    .Where(u => u.Land)
+                    .Select(u => u.BaseUnit)
+                    .Where(u => u.Available || u.TechRequired)
+                    .Where(u => u.BuildLocation != null)
+                    .Distinct()
+                    .ToList();
+
+                var bogen = new BuildOrderGenerator(civ);
+
+                foreach (var unit in units)
+                {
+                    var current = unit;
+
+                    if (current.GetAge(civ) <= 1)
+                    {
+                        var bestage = int.MaxValue;
+                        foreach (var upgr in unit.UpgradesTo)
+                        {
+                            var age = upgr.GetAge(civ);
+                            if (age > 1 && age < bestage)
+                            {
+                                current = upgr;
+                                bestage = age;
+                            }
+                        }
+                    }
+
+                    if (current.GetAge(civ) <= 1)
+                    {
+                        continue;
+                    }
+
+                    var good = false;
+                    switch (current.Class)
+                    {
+                        case UnitClass.Archer:
+                        case UnitClass.Ballista:
+                        case UnitClass.Cavalry:
+                        case UnitClass.CavalryArcher:
+                        case UnitClass.CavalryRaider:
+                        case UnitClass.Conquistador:
+                        case UnitClass.ElephantArcher:
+                        case UnitClass.HandCannoneer:
+                        case UnitClass.Infantry:
+                        case UnitClass.Monk:
+                        case UnitClass.Phalanx:
+                        case UnitClass.Pikeman:
+                        case UnitClass.Raider:
+                        case UnitClass.Scout:
+                        case UnitClass.SiegeWeapon:
+                        case UnitClass.Spearman:
+                        case UnitClass.TwoHandedSwordsMan:
+                        case UnitClass.PackedUnit:
+                        case UnitClass.UnpackedSiegeUnit:
+                        case UnitClass.WarElephant: good = true; break;
+                    }
+
+                    if (!good)
+                    {
+                        continue;
+                    }
+
+                    var bo = bogen.GetBuildOrder(current, null, null, 100);
+                    
+                    if (bo != null)
+                    {
+                        Log.Debug($"found bo for {current.Id} {current.Name} with {bo.Count} elements");
+                    }
+                    else
+                    {
+                        Log.Debug($"no build order for {current.Id} {current.Name}");
+                    }
+                }
+            }
+
+            sw.Stop();
+            Log.Debug("time: " + sw.Elapsed.TotalSeconds);
         }
     }
 }

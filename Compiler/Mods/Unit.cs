@@ -14,11 +14,11 @@ namespace Compiler.Mods
         public readonly int Id;
         public readonly string Name;
         public readonly int Type;
-        public readonly int ClassId;
+        public readonly UnitClass Class;
         public readonly bool Land;
 
         public readonly bool Available;
-        public readonly bool TechRequired;
+        public bool TechRequired => EnablingTechnology != null || UpgradeTechnology != null;
         public readonly Technology TechInitiated;
         public Resource ResourceGathered => GetResourceGathered();
 
@@ -37,6 +37,8 @@ namespace Compiler.Mods
         public readonly List<ArmorValue> BaseArmors;
         public readonly List<ArmorValue> BaseAttacks;
         public readonly double BaseReloadTime;
+        public readonly Technology EnablingTechnology;
+        public readonly Technology UpgradeTechnology;
 
         public readonly List<UnitCommand> Commands = new List<UnitCommand>();
         public Cost BaseCost => new Cost(FoodCost, WoodCost, GoldCost, StoneCost);
@@ -51,7 +53,7 @@ namespace Compiler.Mods
             Id = unit.Id;
             Name = new string(Encoding.ASCII.GetChars(unit.Name).Where(c => char.IsLetterOrDigit(c)).ToArray());
             Type = unit.Type;
-            ClassId = unit.UnitClass;
+            Class = (UnitClass)unit.UnitClass;
 
             BaseHitpoints = unit.HitPoints;
             BaseRange = Math.Max(1, (int)unit.MaxRange);
@@ -68,7 +70,7 @@ namespace Compiler.Mods
 
             BaseReloadTime = unit.ReloadTime;
 
-            if (unit.TerrainRestriction == 4 || unit.TerrainRestriction == 7)
+            if (unit.TerrainRestriction == 4 || unit.TerrainRestriction == 7 || unit.TerrainRestriction == 20)
             {
                 Land = true;
             }
@@ -77,8 +79,9 @@ namespace Compiler.Mods
                 Land = false;
             }
 
-            TechRequired = false;
             Available = false;
+            EnablingTechnology = null;
+            UpgradeTechnology = null;
             if (unit.Enabled == 1)
             {
                 Available = true;
@@ -86,19 +89,13 @@ namespace Compiler.Mods
 
             foreach (var tech in technologies.Where(t => t.Effect != null))
             {
-                if (TechRequired)
-                {
-                    break;
-                }
-
                 foreach (var command in tech.Effect.Commands)
                 {
                     if (command is EnableDisableUnitCommand ec)
                     {
                         if (ec.Enable && ec.UnitId == Id)
                         {
-                            TechRequired = true;
-                            break;
+                            EnablingTechnology = tech;
                         }
                     }
 
@@ -106,8 +103,7 @@ namespace Compiler.Mods
                     {
                         if (uc.ToUnitId == Id)
                         {
-                            TechRequired = true;
-                            break;
+                            UpgradeTechnology = tech;
                         }
                     }
                 }

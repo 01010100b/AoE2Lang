@@ -32,29 +32,15 @@ namespace Compiler
             Civilization = civilization;
         }
 
-        public List<Counter> GetCounters(List<Unit> enemies, List<Unit> counters)
+        public List<Counter> GetCounters(List<Unit> enemies, Dictionary<int, List<Unit>> CountersByAge)
         {
             UnitStats.Clear();
-            foreach (var unit in enemies.Concat(counters))
+            foreach (var unit in enemies.Concat(CountersByAge.Values.SelectMany(l => l)))
             {
                 UnitStats[unit] = new UnitStats(unit, null);
             }
 
             var results = new List<Counter>();
-
-            var counters_by_age = new Dictionary<int, List<Unit>>();
-            for (int i = 1; i <= 4; i++)
-            {
-                if (!counters_by_age.ContainsKey(i))
-                {
-                    counters_by_age.Add(i, new List<Unit>());
-                }
-            }
-
-            foreach (var counter in counters.Where(u => u.ClassId != 35))
-            {
-                counters_by_age[counter.GetAge(Civilization)].Add(counter);
-            }
 
             Parallel.ForEach(enemies, enemy =>
             {
@@ -63,7 +49,7 @@ namespace Compiler
                     var best_score = double.NegativeInfinity;
                     Counter current = new Counter();
 
-                    foreach (var counter in counters_by_age[age])
+                    foreach (var counter in CountersByAge[age])
                     {
                         var score = GetScore(enemy, counter);
                         if (score > best_score)
@@ -84,6 +70,25 @@ namespace Compiler
             });
 
             return results;
+        }
+
+        public List<Counter> GetCounters(List<Unit> enemies, List<Unit> counters)
+        {
+            var counters_by_age = new Dictionary<int, List<Unit>>();
+            for (int i = 1; i <= 4; i++)
+            {
+                if (!counters_by_age.ContainsKey(i))
+                {
+                    counters_by_age.Add(i, new List<Unit>());
+                }
+            }
+
+            foreach (var counter in counters)
+            {
+                counters_by_age[counter.GetAge(Civilization)].Add(counter);
+            }
+
+            return GetCounters(enemies, counters_by_age);
         }
 
         private double GetScore(Unit enemy, Unit counter)
