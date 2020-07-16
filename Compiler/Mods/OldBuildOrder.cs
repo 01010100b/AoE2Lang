@@ -170,7 +170,7 @@ namespace Compiler.Mods
                 {
                     if (command is AttributeModifierCommand ac)
                     {
-                        if (ac.UnitId == Unit.Id || ac.ClassId == Unit.Class)
+                        if (ac.UnitId == Unit.Id || ac.Class == Unit.Class)
                         {
                             var bo = GetTech(tech);
                             if (bo != null)
@@ -230,7 +230,7 @@ namespace Compiler.Mods
                     if (command is AttributeModifierCommand ac)
                     {
                         var unit = vills.FirstOrDefault(u => u.Id == ac.UnitId);
-                        if (unit != null || ac.ClassId == UnitClass.Civilian)
+                        if (unit != null || ac.Class == UnitClass.Civilian)
                         {
                             if (true)
                             {

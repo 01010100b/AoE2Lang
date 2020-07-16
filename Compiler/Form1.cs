@@ -10,6 +10,7 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Windows.Forms;
+using static Compiler.BuildOrderGenerator;
 using static Compiler.CounterGenerator;
 using static Compiler.Lang.Statements;
 
@@ -17,7 +18,7 @@ namespace Compiler
 {
     public partial class Form1 : Form
     {
-        private class Strategy
+        private class OldStrategy
         {
             public readonly List<Counter> Counters = new List<Counter>();
             public readonly Dictionary<Unit, OldBuildOrder> BuildOrders = new Dictionary<Unit, OldBuildOrder>();
@@ -34,6 +35,7 @@ namespace Compiler
             sw.Start();
 
             ButtonCompile.Enabled = false;
+            Refresh();
 
             var settings = new Settings();
 
@@ -67,13 +69,13 @@ namespace Compiler
             mod.Load(settings.DatFile);
             var enemies = mod.Civilizations.SelectMany(c => c.TrainableUnits).Where(u => u.Land && u.Class != UnitClass.Civilian).Distinct().ToList();
 
-            var strategies = new Dictionary<Civilization, Strategy>();
+            var strategies = new Dictionary<Civilization, OldStrategy>();
 
             foreach (var civ in mod.Civilizations.Where(c => c.Id != 0))
             {
                 Log.Debug("doing civ " + civ.Name + " " + civ.Id);
 
-                var strat = new Strategy();
+                var strat = new OldStrategy();
 
                 var units = civ.TrainableUnits
                     .Where(u => u.Land)
@@ -353,15 +355,39 @@ namespace Compiler
 
         private void ButtonTest_Click(object sender, EventArgs e)
         {
-            var sw = new Stopwatch();
-            sw.Start();
+            ButtonTest.Enabled = false;
+            Refresh();
+
+            
 
             var settings = new Settings();
             var mod = new Mod();
             mod.Load(settings.DatFile);
 
+            var sw = new Stopwatch();
+            sw.Start();
+
+            var strategies = new Dictionary<Civilization, Strategy>();
+            AddBuildOrders(mod, strategies);
+            AddCounters(mod, strategies);
+
+            sw.Stop();
+            Log.Debug("time: " + sw.Elapsed.TotalSeconds);
+
+            ButtonTest.Enabled = true;
+        }
+
+        private void AddBuildOrders(Mod mod, Dictionary<Civilization, Strategy> strategies)
+        {
             foreach (var civ in mod.Civilizations.Where(c => c.Id > 0))
             {
+                if (!strategies.ContainsKey(civ))
+                {
+                    strategies.Add(civ, new Strategy());
+                }
+
+                var strat = strategies[civ];
+
                 Log.Debug($"---- {civ.Id} {civ.Name} ----");
 
                 var units = civ.Units
@@ -369,6 +395,7 @@ namespace Compiler
                     .Select(u => u.BaseUnit)
                     .Where(u => u.Available || u.TechRequired)
                     .Where(u => u.BuildLocation != null)
+                    .Where(u => u.Military)
                     .Distinct()
                     .ToList();
 
@@ -427,11 +454,17 @@ namespace Compiler
                         continue;
                     }
 
-                    var bo = bogen.GetBuildOrder(current, null, null, 100);
-                    
-                    if (bo != null)
+                    var bo = bogen.GetBuildOrder(current, null, null, true, true, 100);
+
+                    if (bo != null && bo.Count <= 100)
                     {
                         Log.Debug($"found bo for {current.Id} {current.Name} with {bo.Count} elements");
+                        foreach (var be in bo)
+                        {
+                            Log.Debug(be.ToString());
+                        }
+
+                        strat.BuildOrders.Add(unit, bo);
                     }
                     else
                     {
@@ -439,9 +472,65 @@ namespace Compiler
                     }
                 }
             }
+        }
 
-            sw.Stop();
-            Log.Debug("time: " + sw.Elapsed.TotalSeconds);
+        private void AddCounters(Mod mod, Dictionary<Civilization, Strategy> strategies)
+        {
+            var enemies = mod.Civilizations.SelectMany(c => c.TrainableUnits).Where(u => u.Land && u.Class != UnitClass.Civilian).Distinct().ToList();
+
+            foreach (var civ in mod.Civilizations.Where(c => c.Id > 0))
+            {
+                if (!strategies.ContainsKey(civ))
+                {
+                    strategies.Add(civ, new Strategy());
+                }
+
+                var strat = strategies[civ];
+
+                var counters = new HashSet<Unit>();
+                // get counters
+                foreach (var counter in strat.BuildOrders.Keys)
+                {
+                    counters.Add(counter);
+                    foreach (var upgr in counter.UpgradedFrom.Concat(counter.UpgradesTo))
+                    {
+                        if (upgr.GetAge(civ) >= 2)
+                        {
+                            counters.Add(upgr);
+                        }
+                    }
+                }
+
+                var cgen = new CounterGenerator(civ);
+                var cs = cgen.GetCounters(enemies, counters.ToList());
+
+                var baseunits = new HashSet<Unit>();
+                foreach (var unit in cs.Select(c => c.EnemyUnit))
+                {
+                    baseunits.Add(unit.BaseUnit);
+                }
+
+                foreach (var counter in cs.Where(c => baseunits.Contains(c.EnemyUnit)))
+                {
+                    if (strat.BuildOrders.ContainsKey(counter.CounterUnit))
+                    {
+                        strat.Counters.Add(counter);
+                    }
+                    else
+                    {
+                        foreach (var upgr in counter.CounterUnit.UpgradedFrom)
+                        {
+                            if (strat.BuildOrders.ContainsKey(upgr))
+                            {
+                                strat.Counters.Add(new Counter(counter.EnemyUnit, counter.Age, upgr));
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                Log.Debug("found " + strat.Counters.Count + " counters");
+            }
         }
     }
 }

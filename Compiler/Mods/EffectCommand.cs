@@ -35,7 +35,7 @@ namespace Compiler.Mods
     public class AttributeModifierCommand : EffectCommand
     {
         public readonly int UnitId;
-        public readonly UnitClass ClassId;
+        public readonly UnitClass Class;
         public readonly Attribute Attribute;
         public readonly ModifierMode Mode;
         public readonly float Amount;
@@ -44,7 +44,7 @@ namespace Compiler.Mods
         public AttributeModifierCommand(YTY.AocDatLib.Effect effect)
         {
             UnitId = effect.Arg1;
-            ClassId = (UnitClass)effect.Arg2;
+            Class = (UnitClass)effect.Arg2;
             Attribute = (Attribute)effect.Arg3;
             Amount = effect.Arg4;
 

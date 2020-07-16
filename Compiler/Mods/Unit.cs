@@ -16,9 +16,10 @@ namespace Compiler.Mods
         public readonly int Type;
         public readonly UnitClass Class;
         public readonly bool Land;
+        public bool Military => BaseAttacks.Count(a => a.Amount > 0) > 0 || Commands.Count(c => c.Kind == 104) > 0;
 
         public readonly bool Available;
-        public bool TechRequired => EnablingTechnology != null || UpgradeTechnology != null;
+        public readonly bool TechRequired;
         public readonly Technology TechInitiated;
         public Resource ResourceGathered => GetResourceGathered();
 
@@ -37,8 +38,6 @@ namespace Compiler.Mods
         public readonly List<ArmorValue> BaseArmors;
         public readonly List<ArmorValue> BaseAttacks;
         public readonly double BaseReloadTime;
-        public readonly Technology EnablingTechnology;
-        public readonly Technology UpgradeTechnology;
 
         public readonly List<UnitCommand> Commands = new List<UnitCommand>();
         public Cost BaseCost => new Cost(FoodCost, WoodCost, GoldCost, StoneCost);
@@ -80,13 +79,12 @@ namespace Compiler.Mods
             }
 
             Available = false;
-            EnablingTechnology = null;
-            UpgradeTechnology = null;
             if (unit.Enabled == 1)
             {
                 Available = true;
             }
 
+            TechRequired = false;
             foreach (var tech in technologies.Where(t => t.Effect != null))
             {
                 foreach (var command in tech.Effect.Commands)
@@ -95,7 +93,7 @@ namespace Compiler.Mods
                     {
                         if (ec.Enable && ec.UnitId == Id)
                         {
-                            EnablingTechnology = tech;
+                            TechRequired = true;
                         }
                     }
 
@@ -103,7 +101,7 @@ namespace Compiler.Mods
                     {
                         if (uc.ToUnitId == Id)
                         {
-                            UpgradeTechnology = tech;
+                            TechRequired = true;
                         }
                     }
                 }

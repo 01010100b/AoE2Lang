@@ -35,6 +35,23 @@ namespace Compiler
                 {
                     return $"Set gatherers to {Food} {Wood} {Gold} {Stone}";
                 }
+
+                public override bool Equals(object obj)
+                {
+                    if (obj is GatherersBuildElement other)
+                    {
+                        return Food == other.Food && Wood == other.Wood && Gold == other.Gold && Stone == other.Stone;
+                    }
+                    else
+                    {
+                        return false;
+                    }
+                }
+
+                public override int GetHashCode()
+                {
+                    return Food.GetHashCode() ^ Wood.GetHashCode() ^ Gold.GetHashCode() ^ Stone.GetHashCode();
+                }
             }
 
             public class ResearchBuildElement : BuildOrderElement
@@ -51,6 +68,23 @@ namespace Compiler
                 public override string ToString()
                 {
                     return $"Research {Technology.Id} {Technology.Name}";
+                }
+
+                public override bool Equals(object obj)
+                {
+                    if (obj is ResearchBuildElement re)
+                    {
+                        return Technology == re.Technology;
+                    }
+                    else
+                    {
+                        return false;
+                    }
+                }
+
+                public override int GetHashCode()
+                {
+                    return Technology.GetHashCode();
                 }
             }
 
@@ -76,13 +110,38 @@ namespace Compiler
                         return $"Train {Unit.Id} {Unit.Name}";
                     }
                 }
+
+                public override bool Equals(object obj)
+                {
+                    if (obj is BuildBuildElement other)
+                    {
+                        return Unit == other.Unit;
+                    }
+                    else
+                    {
+                        return false;
+                    }
+                }
+                public override int GetHashCode()
+                {
+                    return Unit.GetHashCode();
+                }
             }
+        }
+
+        private enum BuildOrderElementCategory
+        {
+            NONE, AGE_UP, PRIMARY_UNITUPGR, PRIMARY_STATUPGR, SECONDARY_UNITUPGR, SECONDARY_STATUPGR, SIEGE_UNITUPGR, SIEGE_STATUPGR, ECO_UPGR,
+            PRIMARY_TRAINSITE, SECONDARY_TRAINSITE, SIEGE_TRAINSITE, PRIMARY_TRAIN, SECONDARY_TRAIN, SIEGE_TRAIN
         }
 
         public readonly Civilization Civilization;
 
         private readonly Dictionary<Unit, UnitStats> PossibleUnits = new Dictionary<Unit, UnitStats>();
         private readonly Dictionary<Technology, TechnologyStats> PossibleTechnologies = new Dictionary<Technology, TechnologyStats>();
+        private readonly Dictionary<Unit, HashSet<Technology>> UnitMakeAvailableTechnologies = new Dictionary<Unit, HashSet<Technology>>();
+        private readonly HashSet<Technology> EcoUpgrades = new HashSet<Technology>();
+        private readonly Dictionary<Unit, HashSet<Technology>> UnitUpgrades = new Dictionary<Unit, HashSet<Technology>>();
 
         private readonly Dictionary<Technology, List<BuildOrderElement>> SolvedTechnologies = new Dictionary<Technology, List<BuildOrderElement>>();
         private readonly Dictionary<Unit, List<BuildOrderElement>> SolvedUnits = new Dictionary<Unit, List<BuildOrderElement>>();
@@ -96,9 +155,11 @@ namespace Compiler
             Civilization = civilization;
 
             PossibleUnits.Clear();
+            UnitUpgrades.Clear();
             foreach (var unit in civilization.Units.Where(u => u.Available || u.TechRequired).Where(u => u.Land))
             {
                 PossibleUnits.Add(unit, new UnitStats(unit, null));
+                UnitUpgrades.Add(unit, new HashSet<Technology>());
             }
 
             PossibleTechnologies.Clear();
@@ -107,15 +168,81 @@ namespace Compiler
                 PossibleTechnologies.Add(tech, new TechnologyStats(tech, null));
             }
 
+            UnitMakeAvailableTechnologies.Clear();
+            EcoUpgrades.Clear();
+
+            var vills = Civilization.Units.Where(u => u.Class == UnitClass.Civilian).ToList();
+            foreach (var tech in PossibleTechnologies.Keys.Where(t => t.Effect != null))
+            {
+                foreach (var command in tech.Effect.Commands)
+                {
+                    if (command is EnableDisableUnitCommand ec)
+                    {
+                        if (ec.Enable)
+                        {
+                            var unit = PossibleUnits.Keys.FirstOrDefault(u => u.Id == ec.UnitId);
+                            if (unit != null)
+                            {
+                                if (!UnitMakeAvailableTechnologies.ContainsKey(unit))
+                                {
+                                    UnitMakeAvailableTechnologies.Add(unit, new HashSet<Technology>());
+                                }
+
+                                UnitMakeAvailableTechnologies[unit].Add(tech);
+                            }
+                        }
+                    }
+
+                    if (command is UpgradeUnitCommand uc)
+                    {
+                        var unit = PossibleUnits.Keys.FirstOrDefault(u => u.Id == uc.ToUnitId);
+                        if (unit != null)
+                        {
+                            if (!UnitMakeAvailableTechnologies.ContainsKey(unit))
+                            {
+                                UnitMakeAvailableTechnologies.Add(unit, new HashSet<Technology>());
+                            }
+
+                            UnitMakeAvailableTechnologies[unit].Add(tech);
+                        }
+
+                        unit = PossibleUnits.Keys.FirstOrDefault(u => u.Id == uc.FromUnitId);
+                        if (unit != null)
+                        {
+                            UnitUpgrades[unit].Add(tech);
+                        }
+                    }
+
+                    if (command is AttributeModifierCommand ac)
+                    {
+                        var vill = vills.FirstOrDefault(u => u.Id == ac.UnitId);
+                        if (vill != null || ac.Class == UnitClass.Civilian)
+                        {
+                            EcoUpgrades.Add(tech);
+                        }
+
+                        foreach (var unit in PossibleUnits.Keys)
+                        {
+                            if (ac.UnitId == unit.Id || ac.Class == unit.Class)
+                            {
+                                UnitUpgrades[unit].Add(tech);
+                            }
+                        }
+                    }
+                }
+            }
+
             Random = new Random(DateTime.UtcNow.Ticks.GetHashCode() ^ Guid.NewGuid().GetHashCode() ^ civilization.Id.GetHashCode());
         }
 
-        public List<BuildOrderElement> GetBuildOrder(Unit primary, Unit secondary, Unit siege, int attempts)
+        public List<BuildOrderElement> GetBuildOrder(Unit primary, Unit secondary, Unit siege, bool upgrades, bool eco, int attempts)
         {
             if (primary == null)
             {
                 throw new ArgumentNullException(nameof(primary));
             }
+
+            var starting_techs = new List<Technology>() { Civilization.Age1Tech };
 
             var best = new List<BuildOrderElement>();
             var best_cost = int.MaxValue;
@@ -128,6 +255,11 @@ namespace Compiler
                 SolvedUnits.Clear();
                 SearchedTechnologies.Clear();
                 SearchedUnits.Clear();
+
+                foreach (var tech in starting_techs)
+                {
+                    SolvedTechnologies.Add(tech, new List<BuildOrderElement>());
+                }
 
                 current.Clear();
 
@@ -164,7 +296,43 @@ namespace Compiler
                     current.AddRange(SolvedUnits[siege]);
                 }
 
+                if (upgrades == true)
+                {
+                    var trained = new List<Unit>() { primary, secondary, siege }.Where(u => u != null);
+                    foreach (var unit in trained)
+                    {
+                        if (UnitUpgrades.TryGetValue(unit, out HashSet<Technology> techs))
+                        {
+                            foreach (var tech in techs)
+                            {
+                                SolveTechnology(tech);
+
+                                if (SolvedTechnologies.TryGetValue(tech, out List<BuildOrderElement> bo))
+                                {
+                                    current.AddRange(bo);
+                                }
+                            }
+                        }
+                    }
+                    
+                }
+
+                if (eco == true)
+                {
+                    foreach (var tech in EcoUpgrades)
+                    {
+                        SolveTechnology(tech);
+
+                        if (SolvedTechnologies.TryGetValue(tech, out List<BuildOrderElement> bo))
+                        {
+                            current.AddRange(bo);
+                        }
+                    }
+                }
+
                 current = current.Where(e => e.Buildable).Distinct().ToList();
+
+                
 
                 var cost = 0;
                 foreach (var be in current)
@@ -187,6 +355,8 @@ namespace Compiler
                 }
             }
 
+            OldSort(best, primary, secondary, siege);
+
             return best;
         }
 
@@ -195,7 +365,7 @@ namespace Compiler
             const int TRACK = 0;
             if (unit.Id == TRACK)
             {
-                Log.Debug("trying unit");
+                Log.Debug("trying unit " + TRACK);
             }
 
             if (SearchedUnits.Contains(unit))
@@ -218,6 +388,10 @@ namespace Compiler
 
             if (!PossibleUnits.ContainsKey(unit))
             {
+                if (unit.Id == TRACK)
+                {
+                    Log.Debug("unit not possible " + TRACK);
+                }
                 return;
             }
 
@@ -236,6 +410,10 @@ namespace Compiler
                 }
                 else
                 {
+                    if (unit.Id == TRACK)
+                    {
+                        Log.Debug("unit " + TRACK + " train site failed " + unit.BuildLocation.Id);
+                    }
                     SearchedUnits.Remove(unit);
                     return;
                 }
@@ -244,26 +422,53 @@ namespace Compiler
             // req tech
             if (unit.TechRequired)
             {
-                if (unit.EnablingTechnology != null)
+                if (!UnitMakeAvailableTechnologies.ContainsKey(unit))
                 {
-                    SolveTechnology(unit.EnablingTechnology);
-                }
-                if (unit.UpgradeTechnology != null)
-                {
-                    SolveTechnology(unit.UpgradeTechnology);
+                    if (unit.Id == TRACK)
+                    {
+                        Log.Debug("unit tech failed " + TRACK);
+                    }
+
+                    SearchedUnits.Remove(unit);
+
+                    return;
                 }
 
-                if (unit.EnablingTechnology != null && SolvedTechnologies.TryGetValue(unit.EnablingTechnology, out List<BuildOrderElement> et))
+                var available_techs = new List<Technology>();
+
+                foreach (var tech in UnitMakeAvailableTechnologies[unit])
                 {
-                    bo.AddRange(et);
+                    SolveTechnology(tech);
+
+                    if (SolvedTechnologies.ContainsKey(tech))
+                    {
+                        if (unit.Id == TRACK)
+                        {
+                            Log.Debug("unit " + TRACK + " available tech " + tech.Id);
+                        }
+
+                        available_techs.Add(tech);
+                    }
                 }
-                else if (unit.UpgradeTechnology != null && SolvedTechnologies.TryGetValue(unit.UpgradeTechnology, out List<BuildOrderElement> ut))
+
+                if (available_techs.Count > 0)
                 {
-                    bo.AddRange(ut);
+                    while (available_techs.Count > 1)
+                    {
+                        available_techs.RemoveAt(Random.Next(available_techs.Count));
+                    }
+
+                    bo.AddRange(SolvedTechnologies[available_techs[0]]);
                 }
                 else
                 {
+                    if (unit.Id == TRACK)
+                    {
+                        Log.Debug("unit tech failed " + TRACK);
+                    }
+
                     SearchedUnits.Remove(unit);
+
                     return;
                 }
             }
@@ -277,11 +482,7 @@ namespace Compiler
         private void SolveTechnology(Technology technology)
         {
             const int TRACK = 0;
-            if (technology.Id == TRACK)
-            {
-                Log.Debug("trying tech");
-            }
-
+            
             if (SearchedTechnologies.Contains(technology))
             {
                 return;
@@ -292,11 +493,16 @@ namespace Compiler
                 return;
             }
 
+            if (technology.Id == TRACK)
+            {
+                Log.Debug("searching tech " + TRACK);
+            }
+
             if (!PossibleTechnologies.ContainsKey(technology))
             {
                 if (technology.Id == TRACK)
                 {
-                    Log.Debug("tech not possible");
+                    Log.Debug("tech not possible " + TRACK);
                 }
                 return;
             }
@@ -304,6 +510,11 @@ namespace Compiler
             SearchedTechnologies.Add(technology);
 
             var bo = new List<BuildOrderElement>();
+
+            if (technology.Id == TRACK)
+            {
+                Log.Debug("tech get research " + TRACK);
+            }
 
             // research location
             if (technology.ResearchLocation != null)
@@ -318,11 +529,16 @@ namespace Compiler
                 {
                     if (technology.Id == TRACK)
                     {
-                        Log.Debug("failed tech loc " + technology.ResearchLocation.Id);
+                        Log.Debug("failed tech " + TRACK + " loc " + technology.ResearchLocation.Id);
                     }
                     SearchedTechnologies.Remove(technology);
                     return;
                 }
+            }
+
+            if (technology.Id == TRACK)
+            {
+                Log.Debug("tech get prereqs " + TRACK);
             }
 
             // prereqs
@@ -356,7 +572,11 @@ namespace Compiler
                 {
                     if (technology.Id == TRACK)
                     {
-                        Log.Debug("failed tech prereq " + prereqs.Count);
+                        Log.Debug("failed tech " + TRACK + " prereq " + prereqs.Count);
+                        foreach (var p in prereqs)
+                        {
+                            Log.Debug("  prereq: " + p.Id + " " + p.Name);
+                        }
                     }
                     SearchedTechnologies.Remove(technology);
                     return;
@@ -369,6 +589,11 @@ namespace Compiler
 
                 foreach (var prereq in prereqs)
                 {
+                    if (technology.Id == TRACK)
+                    {
+                        Log.Debug("tech " + TRACK + " adding prereq " + prereq.Id);
+                    }
+
                     bo.AddRange(SolvedTechnologies[prereq]);
                 }
             }
@@ -376,43 +601,40 @@ namespace Compiler
             {
                 var available_units = PossibleUnits.Keys.Where(u => u.TechInitiated == technology).ToList();
 
-                if (available_units.Count > 0)
-                {
-                    var possible_units = new List<Unit>();
+                var possible_units = new List<Unit>();
 
+                foreach (var unit in available_units)
+                {
+                    if (SolvedUnits.TryGetValue(unit, out List<BuildOrderElement> ubo))
+                    {
+                        possible_units.Add(unit);
+                    }
+                }
+
+                if (possible_units.Count == 0)
+                {
                     foreach (var unit in available_units)
                     {
+                        SolveUnit(unit);
+
                         if (SolvedUnits.TryGetValue(unit, out List<BuildOrderElement> ubo))
                         {
                             possible_units.Add(unit);
                         }
                     }
-
-                    if (possible_units.Count == 0)
-                    {
-                        foreach (var unit in available_units)
-                        {
-                            SolveUnit(unit);
-
-                            if (SolvedUnits.TryGetValue(unit, out List<BuildOrderElement> ubo))
-                            {
-                                possible_units.Add(unit);
-                            }
-                        }
-                    }
-
-                    if (possible_units.Count == 0)
-                    {
-                        if (technology.Id == TRACK)
-                        {
-                            Log.Debug("failed tech units");
-                        }
-                        SearchedTechnologies.Remove(technology);
-                        return;
-                    }
-
-                    bo.AddRange(SolvedUnits[possible_units[0]]);
                 }
+
+                if (possible_units.Count == 0)
+                {
+                    if (technology.Id == TRACK)
+                    {
+                        Log.Debug("failed tech " + TRACK + " units");
+                    }
+                    SearchedTechnologies.Remove(technology);
+                    return;
+                }
+
+                bo.AddRange(SolvedUnits[possible_units[0]]);
             }
 
             bo.Add(new ResearchBuildElement(technology));
@@ -424,6 +646,282 @@ namespace Compiler
             {
                 Log.Debug("found tech");
             }
+        }
+
+        private void OldSort(List<BuildOrderElement> bo, Unit primary, Unit secondary, Unit siege)
+        {
+            const int AGE_COST = 100;
+            const int ECO_COST = 150;
+            const int UNIT_STATUPGRADE_COST = 200;
+            const int UNIT_UPGRADE_COST = 300;
+            const int UNIT_TRAINSITE_COST = 400;
+            const int UNIT_TRAIN_COST = 500;
+
+            var categories = new Dictionary<BuildOrderElement, BuildOrderElementCategory>();
+
+            foreach (var be in bo)
+            {
+                if (be is ResearchBuildElement re)
+                {
+                    if (re.Technology == Civilization.Age1Tech || re.Technology == Civilization.Age2Tech
+                        || re.Technology == Civilization.Age3Tech || re.Technology == Civilization.Age4Tech)
+                    {
+                        categories.Add(be, BuildOrderElementCategory.AGE_UP);
+                    }
+                    else if (EcoUpgrades.Contains(re.Technology))
+                    {
+                        categories.Add(be, BuildOrderElementCategory.ECO_UPGR);
+                    }
+                    else if (primary != null && UnitUpgrades[primary].Contains(re.Technology))
+                    {
+                        foreach (var command in re.Technology.Effect.Commands)
+                        {
+                            if (command is EnableDisableUnitCommand ec)
+                            {
+                                if (ec.Enable)
+                                {
+                                    categories.Add(be, BuildOrderElementCategory.PRIMARY_UNITUPGR);
+                                    break;
+                                }
+                            }
+                            else if (command is UpgradeUnitCommand uc)
+                            {
+                                categories.Add(be, BuildOrderElementCategory.PRIMARY_UNITUPGR);
+                                break;
+                            }
+                            else if (command is AttributeModifierCommand ac)
+                            {
+                                categories.Add(be, BuildOrderElementCategory.PRIMARY_STATUPGR);
+                                break;
+                            }
+                        }
+                    }
+                    else if (secondary != null && UnitUpgrades[secondary].Contains(re.Technology))
+                    {
+                        foreach (var command in re.Technology.Effect.Commands)
+                        {
+                            if (command is EnableDisableUnitCommand ec)
+                            {
+                                if (ec.Enable)
+                                {
+                                    categories.Add(be, BuildOrderElementCategory.SECONDARY_UNITUPGR);
+                                    break;
+                                }
+                            }
+                            else if (command is UpgradeUnitCommand uc)
+                            {
+                                categories.Add(be, BuildOrderElementCategory.SECONDARY_UNITUPGR);
+                                break;
+                            }
+                            else if (command is AttributeModifierCommand ac)
+                            {
+                                categories.Add(be, BuildOrderElementCategory.SECONDARY_STATUPGR);
+                                break;
+                            }
+                        }
+                    }
+                    else if (siege != null && UnitUpgrades[primary].Contains(re.Technology))
+                    {
+                        foreach (var command in re.Technology.Effect.Commands)
+                        {
+                            if (command is EnableDisableUnitCommand ec)
+                            {
+                                if (ec.Enable)
+                                {
+                                    categories.Add(be, BuildOrderElementCategory.SIEGE_UNITUPGR);
+                                    break;
+                                }
+                            }
+                            else if (command is UpgradeUnitCommand uc)
+                            {
+                                categories.Add(be, BuildOrderElementCategory.SIEGE_UNITUPGR);
+                                break;
+                            }
+                            else if (command is AttributeModifierCommand ac)
+                            {
+                                categories.Add(be, BuildOrderElementCategory.SIEGE_STATUPGR);
+                                break;
+                            }
+                        }
+                    }
+
+                    if (!categories.ContainsKey(be))
+                    {
+                        categories.Add(be, BuildOrderElementCategory.NONE);
+                    }
+                }
+                else if (be is BuildBuildElement bbe)
+                {
+                    if (primary != null)
+                    {
+                        if (primary == bbe.Unit)
+                        {
+                            categories.Add(be, BuildOrderElementCategory.PRIMARY_TRAIN);
+                            continue;
+                        }
+                        else if (primary.BuildLocation == bbe.Unit)
+                        {
+                            categories.Add(be, BuildOrderElementCategory.PRIMARY_TRAINSITE);
+                            continue;
+                        }
+                    }
+
+                    if (secondary != null)
+                    {
+                        if (secondary == bbe.Unit)
+                        {
+                            categories.Add(be, BuildOrderElementCategory.SECONDARY_TRAIN);
+                            continue;
+                        }
+                        else if (secondary.BuildLocation == bbe.Unit)
+                        {
+                            categories.Add(be, BuildOrderElementCategory.SECONDARY_TRAINSITE);
+                            continue;
+                        }
+                    }
+
+                    if (siege != null)
+                    {
+                        if (siege == bbe.Unit)
+                        {
+                            categories.Add(be, BuildOrderElementCategory.SIEGE_TRAIN);
+                            continue;
+                        }
+                        else if (siege.BuildLocation == bbe.Unit)
+                        {
+                            categories.Add(be, BuildOrderElementCategory.SIEGE_TRAINSITE);
+                            continue;
+                        }
+                    }
+
+                    if (!categories.ContainsKey(be))
+                    {
+                        categories.Add(be, BuildOrderElementCategory.NONE);
+                    }
+                }
+            }
+
+            var unavailable = new Dictionary<BuildOrderElement, HashSet<BuildOrderElement>>();
+            var available = new HashSet<BuildOrderElement>();
+
+            foreach (var be in bo)
+            {
+                var deps = new HashSet<BuildOrderElement>();
+                List<BuildOrderElement> bes = null;
+                if (be is ResearchBuildElement re)
+                {
+                    bes = SolvedTechnologies[re.Technology].Where(e => e.Buildable).ToList();
+                }
+                else if (be is BuildBuildElement bbe)
+                {
+                    bes = SolvedUnits[bbe.Unit].Where(e => e.Buildable).ToList();
+                }
+
+                bes.RemoveAt(bes.Count - 1);
+
+                foreach (var bobe in bes)
+                {
+                    if (bo.Contains(bobe))
+                    {
+                        deps.Add(bobe);
+                    }
+                }
+
+                if (deps.Count == 0)
+                {
+                    available.Add(be);
+                }
+                else
+                {
+                    unavailable.Add(be, deps);
+                }
+            }
+
+            bo.Clear();
+
+            var training_primary = false;
+            var training_secondary = false;
+            var training_siege = false;
+
+            var age_primary = 1;
+            var age_secondary = 1;
+            var age_siege = 1;
+
+            if (primary != null)
+            {
+                age_primary = primary.GetAge(Civilization);
+            }
+            if (secondary != null)
+            {
+                age_secondary = secondary.GetAge(Civilization);
+            }
+            if (siege != null)
+            {
+                age_siege = siege.GetAge(Civilization);
+            }
+
+            var current_age = 1;
+
+            while (available.Count > 0)
+            {
+                var best = available.First();
+                var best_cost = int.MinValue;
+
+                foreach (var be in available)
+                {
+                    var cost = 0;
+
+                    var cat = categories[be];
+
+                    switch (cat)
+                    {
+                        case BuildOrderElementCategory.AGE_UP: cost = AGE_COST; break;
+                        case BuildOrderElementCategory.ECO_UPGR: cost = ECO_COST; break;
+
+                        case BuildOrderElementCategory.PRIMARY_STATUPGR: cost = training_primary ? UNIT_STATUPGRADE_COST + 30 : 0; break;
+                        case BuildOrderElementCategory.PRIMARY_TRAIN: cost = UNIT_TRAIN_COST + 30; break;
+                        case BuildOrderElementCategory.PRIMARY_TRAINSITE: cost = current_age >= age_primary ? UNIT_TRAINSITE_COST + 30 : 0; break;
+                        case BuildOrderElementCategory.PRIMARY_UNITUPGR: cost = current_age >= age_primary ? UNIT_UPGRADE_COST + 30 : 0; break;
+
+                        case BuildOrderElementCategory.SECONDARY_STATUPGR: cost = training_secondary ? UNIT_STATUPGRADE_COST + 20 : 0; break;
+                        case BuildOrderElementCategory.SECONDARY_TRAIN: cost = UNIT_TRAIN_COST + 20; break;
+                        case BuildOrderElementCategory.SECONDARY_TRAINSITE: cost = current_age >= age_secondary ? UNIT_TRAINSITE_COST + 20 : 0; break;
+                        case BuildOrderElementCategory.SECONDARY_UNITUPGR: cost = current_age >= age_secondary ? UNIT_UPGRADE_COST + 20 : 0; break;
+
+                        case BuildOrderElementCategory.SIEGE_STATUPGR: cost = training_siege ? UNIT_STATUPGRADE_COST + 10 : 0; break;
+                        case BuildOrderElementCategory.SIEGE_TRAIN: cost = UNIT_TRAIN_COST + 10; break;
+                        case BuildOrderElementCategory.SIEGE_TRAINSITE: cost = current_age >= age_siege ? UNIT_TRAINSITE_COST + 10 : 0; break;
+                        case BuildOrderElementCategory.SIEGE_UNITUPGR: cost = current_age >= age_siege ? UNIT_UPGRADE_COST + 10 : 0; break;
+                    }
+
+                    if (cost > best_cost)
+                    {
+                        best = be;
+                        best_cost = cost;
+                    }
+                }
+
+                bo.Add(best);
+                available.Remove(best);
+                foreach (var kvp in unavailable.ToList())
+                {
+                    kvp.Value.Remove(best);
+                    if (kvp.Value.Count == 0)
+                    {
+                        unavailable.Remove(kvp.Key);
+                        available.Add(kvp.Key);
+                    }
+                }
+
+                switch (categories[best])
+                {
+                    case BuildOrderElementCategory.AGE_UP: current_age++; break;
+                    case BuildOrderElementCategory.PRIMARY_TRAIN: training_primary = true; break;
+                    case BuildOrderElementCategory.SECONDARY_TRAIN: training_secondary = true; break;
+                    case BuildOrderElementCategory.SIEGE_TRAIN: training_siege = true; break;
+                }
+            }
+
         }
     }
 }
