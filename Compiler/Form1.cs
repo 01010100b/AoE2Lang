@@ -112,7 +112,35 @@ namespace Compiler
                         continue;
                     }
 
-                    
+                    var good = false;
+                    switch (current.Class)
+                    {
+                        case UnitClass.Archer:
+                        case UnitClass.Ballista:
+                        case UnitClass.Cavalry:
+                        case UnitClass.CavalryArcher:
+                        case UnitClass.CavalryRaider:
+                        case UnitClass.Conquistador:
+                        case UnitClass.ElephantArcher:
+                        case UnitClass.HandCannoneer:
+                        case UnitClass.Infantry:
+                        case UnitClass.Monk:
+                        case UnitClass.Phalanx:
+                        case UnitClass.Pikeman:
+                        case UnitClass.Raider:
+                        case UnitClass.Scout:
+                        //case UnitClass.SiegeWeapon:
+                        case UnitClass.Spearman:
+                        case UnitClass.TwoHandedSwordsMan:
+                        //case UnitClass.PackedUnit:
+                        //case UnitClass.UnpackedSiegeUnit:
+                        case UnitClass.WarElephant: good = true; break;
+                    }
+
+                    if (!good)
+                    {
+                        continue;
+                    }
 
                     if (current.Id == 74)
                     {
