@@ -1,7 +1,9 @@
 ﻿using Compiler.Mods;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
+using System.Net;
 using System.Text;
 using System.Threading.Tasks;
 using static Compiler.BuildOrderGenerator.BuildOrderElement;
@@ -12,6 +14,15 @@ namespace Compiler
     {
         public abstract class BuildOrderElement
         {
+            public enum BuildOrderElementCategory
+            {
+                NONE, AGE_UP, PRIMARY_UNITUPGR, PRIMARY_STATUPGR, SECONDARY_UNITUPGR, SECONDARY_STATUPGR, SIEGE_UNITUPGR, SIEGE_STATUPGR, ECO_UPGR,
+                PRIMARY_TRAINSITE, SECONDARY_TRAINSITE, SIEGE_TRAINSITE, PRIMARY_TRAIN, SECONDARY_TRAIN, SIEGE_TRAIN, WOOD_DROPSITE, FOOD_DROPSITE,
+                GOLD_DROPSITE, STONE_DROPSITE
+            }
+
+            public BuildOrderElementCategory Category { get; set; }
+            public double Priority { get; set; }
             public abstract bool Buildable { get; }
 
             public class GatherersBuildElement : BuildOrderElement
@@ -67,7 +78,7 @@ namespace Compiler
 
                 public override string ToString()
                 {
-                    return $"Research {Technology.Id} {Technology.Name}";
+                    return $"Research {Technology.Id} {Technology.Name} {Category} {(int)Priority}";
                 }
 
                 public override bool Equals(object obj)
@@ -103,11 +114,11 @@ namespace Compiler
                 {
                     if (Unit.Type == 80)
                     {
-                        return $"Build {Unit.Id} {Unit.Name}";
+                        return $"Build {Unit.Id} {Unit.Name} {Category} {(int)Priority}";
                     }
                     else
                     {
-                        return $"Train {Unit.Id} {Unit.Name}";
+                        return $"Train {Unit.Id} {Unit.Name} {Category} {(int)Priority}";
                     }
                 }
 
@@ -129,11 +140,7 @@ namespace Compiler
             }
         }
 
-        private enum BuildOrderElementCategory
-        {
-            NONE, AGE_UP, PRIMARY_UNITUPGR, PRIMARY_STATUPGR, SECONDARY_UNITUPGR, SECONDARY_STATUPGR, SIEGE_UNITUPGR, SIEGE_STATUPGR, ECO_UPGR,
-            PRIMARY_TRAINSITE, SECONDARY_TRAINSITE, SIEGE_TRAINSITE, PRIMARY_TRAIN, SECONDARY_TRAIN, SIEGE_TRAIN
-        }
+        
 
         public readonly Civilization Civilization;
 
@@ -142,6 +149,7 @@ namespace Compiler
         private readonly Dictionary<Unit, HashSet<Technology>> UnitMakeAvailableTechnologies = new Dictionary<Unit, HashSet<Technology>>();
         private readonly HashSet<Technology> EcoUpgrades = new HashSet<Technology>();
         private readonly Dictionary<Unit, HashSet<Technology>> UnitUpgrades = new Dictionary<Unit, HashSet<Technology>>();
+        private readonly Dictionary<Resource, Unit> Dropsites = new Dictionary<Resource, Unit>();
 
         private readonly Dictionary<Technology, List<BuildOrderElement>> SolvedTechnologies = new Dictionary<Technology, List<BuildOrderElement>>();
         private readonly Dictionary<Unit, List<BuildOrderElement>> SolvedUnits = new Dictionary<Unit, List<BuildOrderElement>>();
@@ -232,6 +240,16 @@ namespace Compiler
                 }
             }
 
+            Dropsites.Clear();
+            foreach (var resource in Enum.GetValues(typeof(Resource)).Cast<Resource>())
+            {
+                var site = Civilization.GetDropSite(resource);
+                if (site != null)
+                {
+                    Dropsites.Add(resource, site);
+                }
+            }
+
             Random = new Random(DateTime.UtcNow.Ticks.GetHashCode() ^ Guid.NewGuid().GetHashCode() ^ civilization.Id.GetHashCode());
         }
 
@@ -245,7 +263,7 @@ namespace Compiler
             var starting_techs = new List<Technology>() { Civilization.Age1Tech };
 
             var best = new List<BuildOrderElement>();
-            var best_cost = int.MaxValue;
+            var best_cost = double.MaxValue;
 
             var current = new List<BuildOrderElement>();
 
@@ -332,20 +350,8 @@ namespace Compiler
 
                 current = current.Where(e => e.Buildable).Distinct().ToList();
 
-                
 
-                var cost = 0;
-                foreach (var be in current)
-                {
-                    if (be is ResearchBuildElement re)
-                    {
-                        cost += PossibleTechnologies[re.Technology].Cost.Total;
-                    }
-                    else if (be is BuildBuildElement bbe)
-                    {
-                        cost += PossibleUnits[bbe.Unit].Cost.Total;
-                    }
-                }
+                var cost = OldSortAndScore(current, primary, secondary, siege);
 
                 if (cost < best_cost)
                 {
@@ -354,8 +360,6 @@ namespace Compiler
                     best_cost = cost;
                 }
             }
-
-            OldSort(best, primary, secondary, siege);
 
             return best;
         }
@@ -648,158 +652,19 @@ namespace Compiler
             }
         }
 
-        private void OldSort(List<BuildOrderElement> bo, Unit primary, Unit secondary, Unit siege)
+        private double OldSortAndScore(List<BuildOrderElement> bo, Unit primary, Unit secondary, Unit siege)
         {
+            const double EXTRA_COST_FACTOR = 10d;
+
             const int AGE_COST = 100;
             const int ECO_COST = 150;
             const int UNIT_STATUPGRADE_COST = 200;
             const int UNIT_UPGRADE_COST = 300;
             const int UNIT_TRAINSITE_COST = 400;
+            const int DROPSITE_COST = 450;
             const int UNIT_TRAIN_COST = 500;
 
-            var categories = new Dictionary<BuildOrderElement, BuildOrderElementCategory>();
-
-            foreach (var be in bo)
-            {
-                if (be is ResearchBuildElement re)
-                {
-                    if (re.Technology == Civilization.Age1Tech || re.Technology == Civilization.Age2Tech
-                        || re.Technology == Civilization.Age3Tech || re.Technology == Civilization.Age4Tech)
-                    {
-                        categories.Add(be, BuildOrderElementCategory.AGE_UP);
-                    }
-                    else if (EcoUpgrades.Contains(re.Technology))
-                    {
-                        categories.Add(be, BuildOrderElementCategory.ECO_UPGR);
-                    }
-                    else if (primary != null && UnitUpgrades[primary].Contains(re.Technology))
-                    {
-                        foreach (var command in re.Technology.Effect.Commands)
-                        {
-                            if (command is EnableDisableUnitCommand ec)
-                            {
-                                if (ec.Enable)
-                                {
-                                    categories.Add(be, BuildOrderElementCategory.PRIMARY_UNITUPGR);
-                                    break;
-                                }
-                            }
-                            else if (command is UpgradeUnitCommand uc)
-                            {
-                                categories.Add(be, BuildOrderElementCategory.PRIMARY_UNITUPGR);
-                                break;
-                            }
-                            else if (command is AttributeModifierCommand ac)
-                            {
-                                categories.Add(be, BuildOrderElementCategory.PRIMARY_STATUPGR);
-                                break;
-                            }
-                        }
-                    }
-                    else if (secondary != null && UnitUpgrades[secondary].Contains(re.Technology))
-                    {
-                        foreach (var command in re.Technology.Effect.Commands)
-                        {
-                            if (command is EnableDisableUnitCommand ec)
-                            {
-                                if (ec.Enable)
-                                {
-                                    categories.Add(be, BuildOrderElementCategory.SECONDARY_UNITUPGR);
-                                    break;
-                                }
-                            }
-                            else if (command is UpgradeUnitCommand uc)
-                            {
-                                categories.Add(be, BuildOrderElementCategory.SECONDARY_UNITUPGR);
-                                break;
-                            }
-                            else if (command is AttributeModifierCommand ac)
-                            {
-                                categories.Add(be, BuildOrderElementCategory.SECONDARY_STATUPGR);
-                                break;
-                            }
-                        }
-                    }
-                    else if (siege != null && UnitUpgrades[primary].Contains(re.Technology))
-                    {
-                        foreach (var command in re.Technology.Effect.Commands)
-                        {
-                            if (command is EnableDisableUnitCommand ec)
-                            {
-                                if (ec.Enable)
-                                {
-                                    categories.Add(be, BuildOrderElementCategory.SIEGE_UNITUPGR);
-                                    break;
-                                }
-                            }
-                            else if (command is UpgradeUnitCommand uc)
-                            {
-                                categories.Add(be, BuildOrderElementCategory.SIEGE_UNITUPGR);
-                                break;
-                            }
-                            else if (command is AttributeModifierCommand ac)
-                            {
-                                categories.Add(be, BuildOrderElementCategory.SIEGE_STATUPGR);
-                                break;
-                            }
-                        }
-                    }
-
-                    if (!categories.ContainsKey(be))
-                    {
-                        categories.Add(be, BuildOrderElementCategory.NONE);
-                    }
-                }
-                else if (be is BuildBuildElement bbe)
-                {
-                    if (primary != null)
-                    {
-                        if (primary == bbe.Unit)
-                        {
-                            categories.Add(be, BuildOrderElementCategory.PRIMARY_TRAIN);
-                            continue;
-                        }
-                        else if (primary.BuildLocation == bbe.Unit)
-                        {
-                            categories.Add(be, BuildOrderElementCategory.PRIMARY_TRAINSITE);
-                            continue;
-                        }
-                    }
-
-                    if (secondary != null)
-                    {
-                        if (secondary == bbe.Unit)
-                        {
-                            categories.Add(be, BuildOrderElementCategory.SECONDARY_TRAIN);
-                            continue;
-                        }
-                        else if (secondary.BuildLocation == bbe.Unit)
-                        {
-                            categories.Add(be, BuildOrderElementCategory.SECONDARY_TRAINSITE);
-                            continue;
-                        }
-                    }
-
-                    if (siege != null)
-                    {
-                        if (siege == bbe.Unit)
-                        {
-                            categories.Add(be, BuildOrderElementCategory.SIEGE_TRAIN);
-                            continue;
-                        }
-                        else if (siege.BuildLocation == bbe.Unit)
-                        {
-                            categories.Add(be, BuildOrderElementCategory.SIEGE_TRAINSITE);
-                            continue;
-                        }
-                    }
-
-                    if (!categories.ContainsKey(be))
-                    {
-                        categories.Add(be, BuildOrderElementCategory.NONE);
-                    }
-                }
-            }
+            AssignCategories(bo, primary, secondary, siege);
 
             var unavailable = new Dictionary<BuildOrderElement, HashSet<BuildOrderElement>>();
             var available = new HashSet<BuildOrderElement>();
@@ -839,6 +704,8 @@ namespace Compiler
 
             bo.Clear();
 
+            var score = 0d;
+
             var training_primary = false;
             var training_secondary = false;
             var training_siege = false;
@@ -871,9 +738,7 @@ namespace Compiler
                 {
                     var cost = 0;
 
-                    var cat = categories[be];
-
-                    switch (cat)
+                    switch (be.Category)
                     {
                         case BuildOrderElementCategory.AGE_UP: cost = AGE_COST; break;
                         case BuildOrderElementCategory.ECO_UPGR: cost = ECO_COST; break;
@@ -892,6 +757,11 @@ namespace Compiler
                         case BuildOrderElementCategory.SIEGE_TRAIN: cost = UNIT_TRAIN_COST + 10; break;
                         case BuildOrderElementCategory.SIEGE_TRAINSITE: cost = current_age >= age_siege ? UNIT_TRAINSITE_COST + 10 : 0; break;
                         case BuildOrderElementCategory.SIEGE_UNITUPGR: cost = current_age >= age_siege ? UNIT_UPGRADE_COST + 10 : 0; break;
+
+                        case BuildOrderElementCategory.FOOD_DROPSITE: cost = DROPSITE_COST + 20; break;
+                        case BuildOrderElementCategory.WOOD_DROPSITE: cost = DROPSITE_COST + 30; break;
+                        case BuildOrderElementCategory.GOLD_DROPSITE: cost = DROPSITE_COST + 10; break;
+                        case BuildOrderElementCategory.STONE_DROPSITE: cost = DROPSITE_COST; break;
                     }
 
                     if (cost > best_cost)
@@ -902,6 +772,19 @@ namespace Compiler
                 }
 
                 bo.Add(best);
+
+                best.Priority = best_cost;
+
+                score += EXTRA_COST_FACTOR * best_cost * bo.Count;
+                if (best is ResearchBuildElement re)
+                {
+                    score += PossibleTechnologies[re.Technology].Cost.Total;
+                }
+                else if (best is BuildBuildElement bbe)
+                {
+                    score += PossibleUnits[bbe.Unit].Cost.Total;
+                }
+
                 available.Remove(best);
                 foreach (var kvp in unavailable.ToList())
                 {
@@ -913,7 +796,7 @@ namespace Compiler
                     }
                 }
 
-                switch (categories[best])
+                switch (best.Category)
                 {
                     case BuildOrderElementCategory.AGE_UP: current_age++; break;
                     case BuildOrderElementCategory.PRIMARY_TRAIN: training_primary = true; break;
@@ -922,6 +805,180 @@ namespace Compiler
                 }
             }
 
+            return score;
+        }
+
+        private void AssignCategories(List<BuildOrderElement> bo, Unit primary, Unit secondary, Unit siege)
+        {
+            foreach (var be in bo)
+            {
+                be.Category = BuildOrderElementCategory.NONE;
+
+                if (be is ResearchBuildElement re)
+                {
+                    if (re.Technology == Civilization.Age1Tech || re.Technology == Civilization.Age2Tech
+                        || re.Technology == Civilization.Age3Tech || re.Technology == Civilization.Age4Tech)
+                    {
+                        be.Category = BuildOrderElementCategory.AGE_UP;
+                    }
+                    else if (EcoUpgrades.Contains(re.Technology))
+                    {
+                        be.Category = BuildOrderElementCategory.ECO_UPGR;
+                    }
+                    else if (primary != null && UnitUpgrades[primary].Contains(re.Technology))
+                    {
+                        foreach (var command in re.Technology.Effect.Commands)
+                        {
+                            if (command is EnableDisableUnitCommand ec)
+                            {
+                                if (ec.Enable)
+                                {
+                                    be.Category = BuildOrderElementCategory.PRIMARY_UNITUPGR;
+                                    break;
+                                }
+                            }
+                            else if (command is UpgradeUnitCommand uc)
+                            {
+                                be.Category = BuildOrderElementCategory.PRIMARY_UNITUPGR;
+                                break;
+                            }
+                            else if (command is AttributeModifierCommand ac)
+                            {
+                                be.Category = BuildOrderElementCategory.PRIMARY_STATUPGR;
+                                break;
+                            }
+                        }
+                    }
+                    else if (secondary != null && UnitUpgrades[secondary].Contains(re.Technology))
+                    {
+                        foreach (var command in re.Technology.Effect.Commands)
+                        {
+                            if (command is EnableDisableUnitCommand ec)
+                            {
+                                if (ec.Enable)
+                                {
+                                    be.Category = BuildOrderElementCategory.SECONDARY_UNITUPGR;
+                                    break;
+                                }
+                            }
+                            else if (command is UpgradeUnitCommand uc)
+                            {
+                                be.Category = BuildOrderElementCategory.SECONDARY_UNITUPGR;
+                                break;
+                            }
+                            else if (command is AttributeModifierCommand ac)
+                            {
+                                be.Category = BuildOrderElementCategory.SECONDARY_STATUPGR;
+                                break;
+                            }
+                        }
+                    }
+                    else if (siege != null && UnitUpgrades[primary].Contains(re.Technology))
+                    {
+                        foreach (var command in re.Technology.Effect.Commands)
+                        {
+                            if (command is EnableDisableUnitCommand ec)
+                            {
+                                if (ec.Enable)
+                                {
+                                    be.Category = BuildOrderElementCategory.SIEGE_UNITUPGR;
+                                    break;
+                                }
+                            }
+                            else if (command is UpgradeUnitCommand uc)
+                            {
+                                be.Category = BuildOrderElementCategory.SIEGE_UNITUPGR;
+                                break;
+                            }
+                            else if (command is AttributeModifierCommand ac)
+                            {
+                                be.Category = BuildOrderElementCategory.SIEGE_STATUPGR;
+                                break;
+                            }
+                        }
+                    }
+                }
+                else if (be is BuildBuildElement bbe)
+                {
+                    if (Dropsites.TryGetValue(Resource.Food, out Unit site))
+                    {
+                        if (bbe.Unit == site)
+                        {
+                            be.Category = BuildOrderElementCategory.FOOD_DROPSITE;
+                            continue;
+                        }
+                    }
+
+                    if (Dropsites.TryGetValue(Resource.Wood, out site))
+                    {
+                        if (bbe.Unit == site)
+                        {
+                            be.Category = BuildOrderElementCategory.WOOD_DROPSITE;
+                            continue;
+                        }
+                    }
+
+                    if (Dropsites.TryGetValue(Resource.Gold, out site))
+                    {
+                        if (bbe.Unit == site)
+                        {
+                            be.Category = BuildOrderElementCategory.GOLD_DROPSITE;
+                            continue;
+                        }
+                    }
+
+                    if (Dropsites.TryGetValue(Resource.Stone, out site))
+                    {
+                        if (bbe.Unit == site)
+                        {
+                            be.Category = BuildOrderElementCategory.STONE_DROPSITE;
+                            continue;
+                        }
+                    }
+
+                    if (primary != null)
+                    {
+                        if (primary == bbe.Unit)
+                        {
+                            be.Category = BuildOrderElementCategory.PRIMARY_TRAIN;
+                            continue;
+                        }
+                        else if (primary.BuildLocation == bbe.Unit)
+                        {
+                            be.Category = BuildOrderElementCategory.PRIMARY_TRAINSITE;
+                            continue;
+                        }
+                    }
+
+                    if (secondary != null)
+                    {
+                        if (secondary == bbe.Unit)
+                        {
+                            be.Category = BuildOrderElementCategory.SECONDARY_TRAIN;
+                            continue;
+                        }
+                        else if (secondary.BuildLocation == bbe.Unit)
+                        {
+                            be.Category = BuildOrderElementCategory.SECONDARY_TRAINSITE;
+                            continue;
+                        }
+                    }
+
+                    if (siege != null)
+                    {
+                        if (siege == bbe.Unit)
+                        {
+                            be.Category = BuildOrderElementCategory.SIEGE_TRAIN;
+                            continue;
+                        }
+                        else if (siege.BuildLocation == bbe.Unit)
+                        {
+                            be.Category = BuildOrderElementCategory.SIEGE_TRAINSITE;
+                            continue;
+                        }
+                    }
+                }
+            }
         }
     }
 }

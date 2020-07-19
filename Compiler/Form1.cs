@@ -385,9 +385,6 @@ namespace Compiler
         {
             ButtonTest.Enabled = false;
             Refresh();
-
-            
-
             var settings = new Settings();
             var mod = new Mod();
             mod.Load(settings.DatFile);
@@ -416,6 +413,7 @@ namespace Compiler
 
                 var strat = strategies[civ];
 
+                Log.Debug("");
                 Log.Debug($"---- {civ.Id} {civ.Name} ----");
 
                 var units = civ.Units
@@ -469,11 +467,11 @@ namespace Compiler
                         case UnitClass.Pikeman:
                         case UnitClass.Raider:
                         case UnitClass.Scout:
-                        case UnitClass.SiegeWeapon:
+                        //case UnitClass.SiegeWeapon:
                         case UnitClass.Spearman:
                         case UnitClass.TwoHandedSwordsMan:
-                        case UnitClass.PackedUnit:
-                        case UnitClass.UnpackedSiegeUnit:
+                        //case UnitClass.PackedUnit:
+                        //case UnitClass.UnpackedSiegeUnit:
                         case UnitClass.WarElephant: good = true; break;
                     }
 
@@ -486,6 +484,7 @@ namespace Compiler
 
                     if (bo != null && bo.Count <= 100)
                     {
+                        Log.Debug("");
                         Log.Debug($"found bo for {current.Id} {current.Name} with {bo.Count} elements");
                         foreach (var be in bo)
                         {

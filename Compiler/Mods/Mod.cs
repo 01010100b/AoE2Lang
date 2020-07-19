@@ -101,9 +101,9 @@ namespace Compiler.Mods
             }
 
             Units.Sort((a, b) => a.Id.CompareTo(b.Id));
-            for (int i = 0; i < Units.Count; i++)
+            foreach (var unit in Units)
             {
-                Units[i].Commands.AddRange(dat.UnitCommands[i]);
+                unit.Commands.AddRange(dat.UnitCommands[unit.Id]);
             }
 
             var upgrades = Technologies

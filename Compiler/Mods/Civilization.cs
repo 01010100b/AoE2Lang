@@ -101,6 +101,8 @@ namespace Compiler.Mods
                 }
             }
 
+            Units.Sort((a, b) => a.Id.CompareTo(b.Id));
+
             foreach (var resource in Enum.GetValues(typeof(Resource)).Cast<Resource>().Where(r => r != Resource.None))
             {
                 Resources.Add(resource, civilization.Resources[(int)resource]);
