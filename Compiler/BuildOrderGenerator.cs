@@ -455,12 +455,7 @@ namespace Compiler
 
                 if (available_techs.Count > 0)
                 {
-                    while (available_techs.Count > 1)
-                    {
-                        available_techs.RemoveAt(Random.Next(available_techs.Count));
-                    }
-
-                    bo.AddRange(SolvedTechnologies[available_techs[0]]);
+                    bo.AddRange(SolvedTechnologies[available_techs[Random.Next(available_techs.Count)]]);
                 }
                 else
                 {
