@@ -235,7 +235,7 @@ namespace Compiler
                 sb.AppendLine($"\t(up-compare-goal gl-current-count c:>= 3)");
                 sb.AppendLine("=>");
                 sb.AppendLine($"\t(set-strategic-number sn-target-unit {unit.BaseUnit.Id})");
-                sb.AppendLine($"\t(up-modify-goal gl-target-count g:== gl-current-count)");
+                sb.AppendLine($"\t(up-modify-goal gl-target-count g:= gl-current-count)");
                 sb.AppendLine(")");
             }
 
