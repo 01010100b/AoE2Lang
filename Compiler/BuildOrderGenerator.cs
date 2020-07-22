@@ -140,8 +140,6 @@ namespace Compiler
             }
         }
 
-        
-
         public readonly Civilization Civilization;
 
         private readonly Dictionary<Unit, UnitStats> PossibleUnits = new Dictionary<Unit, UnitStats>();
@@ -351,7 +349,7 @@ namespace Compiler
                 current = current.Where(e => e.Buildable).Distinct().ToList();
 
 
-                var cost = OldSortAndScore(current, primary, secondary, siege);
+                var cost = SortAndScore(current, primary, secondary, siege);
 
                 if (cost < best_cost)
                 {
@@ -652,7 +650,7 @@ namespace Compiler
             }
         }
 
-        private double OldSortAndScore(List<BuildOrderElement> bo, Unit primary, Unit secondary, Unit siege)
+        private double SortAndScore(List<BuildOrderElement> bo, Unit primary, Unit secondary, Unit siege)
         {
             const double EXTRA_COST_FACTOR = 10d;
 
