@@ -30,7 +30,6 @@ namespace Compiler
 
                     if (INTRINSICS.Contains(call.Function.Name))
                     {
-                        
                         rules = CompileIntrinsic(call);
                     }
 
