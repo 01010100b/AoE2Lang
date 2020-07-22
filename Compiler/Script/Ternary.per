@@ -18,6 +18,7 @@
 (defconst housing-unit house)
 (defconst food-generating-unit farm)
 (defconst trading-building market)
+(defconst villager-production-building town-center)
 
 #defglobal gl-with-escrow = with-escrow
 #defglobal gl-without-escrow = without-escrow
@@ -468,6 +469,12 @@ sn-stone-gatherer-percentage = gl-stone
 #if (civilian-population < 120) (can-train-with-escrow civilian-unit)
 
 	up-train gl-with-escrow c: civilian-unit
+	
+#end-if
+
+#if (building-type-count-total villager-production-building == 0) (can-build-with-escrow villager-production-building)
+
+	up-build place-normal gl-with-escrow c: villager-production-building
 	
 #end-if
 
