@@ -32,7 +32,30 @@ namespace Compiler
             Civilization = civilization;
         }
 
-        public List<Counter> GetCounters(List<Unit> enemies, Dictionary<int, List<Unit>> CountersByAge)
+        public List<Counter> GetCounters(List<Unit> enemies, List<Unit> counters)
+        {
+            var counters_by_age = new Dictionary<int, List<Unit>>();
+            for (int i = 1; i <= 4; i++)
+            {
+                if (!counters_by_age.ContainsKey(i))
+                {
+                    counters_by_age.Add(i, new List<Unit>());
+                }
+            }
+
+            foreach (var counter in counters)
+            {
+                var age = counter.GetAge(Civilization);
+                for (int i = age; i <= 4; i++)
+                {
+                    counters_by_age[i].Add(counter);
+                }
+            }
+
+            return GetCounters(enemies, counters_by_age);
+        }
+
+        private List<Counter> GetCounters(List<Unit> enemies, Dictionary<int, List<Unit>> CountersByAge)
         {
             UnitStats.Clear();
             foreach (var unit in enemies.Concat(CountersByAge.Values.SelectMany(l => l)))
@@ -70,25 +93,6 @@ namespace Compiler
             });
 
             return results;
-        }
-
-        public List<Counter> GetCounters(List<Unit> enemies, List<Unit> counters)
-        {
-            var counters_by_age = new Dictionary<int, List<Unit>>();
-            for (int i = 1; i <= 4; i++)
-            {
-                if (!counters_by_age.ContainsKey(i))
-                {
-                    counters_by_age.Add(i, new List<Unit>());
-                }
-            }
-
-            foreach (var counter in counters)
-            {
-                counters_by_age[counter.GetAge(Civilization)].Add(counter);
-            }
-
-            return GetCounters(enemies, counters_by_age);
         }
 
         private double GetScore(Unit enemy, Unit counter)
