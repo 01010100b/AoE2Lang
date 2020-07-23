@@ -97,6 +97,9 @@
 	(set-strategic-number sn-maximum-wood-drop-distance 50)
 	(set-strategic-number sn-maximum-gold-drop-distance 50)
 	(set-strategic-number sn-maximum-stone-drop-distance 50)
+	(set-strategic-number sn-initial-exploration-required 0)
+	(set-strategic-number sn-unexplored-construction 1)
+	(set-strategic-number sn-town-center-placement wood-dropsite)
 	(disable-self)
 )
 
@@ -474,7 +477,9 @@ sn-stone-gatherer-percentage = gl-stone
 
 #if (building-type-count-total villager-production-building == 0) (can-build-with-escrow villager-production-building)
 
-	up-build place-normal gl-with-escrow c: villager-production-building
+	up-release-escrow
+	build villager-production-building
+	chat-local-to-self "getting tc"
 	
 #end-if
 
