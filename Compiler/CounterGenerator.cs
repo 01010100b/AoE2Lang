@@ -9,6 +9,49 @@ namespace Compiler
 {
     class CounterGenerator
     {
+        public static double GetScore(UnitStats counter, UnitStats enemy)
+        {
+            var attackenemy = 0d;
+            foreach (var attack in enemy.Attacks)
+            {
+                foreach (var armor in counter.Armors)
+                {
+                    if (attack.Id == armor.Id)
+                    {
+                        attackenemy += Math.Max(0, attack.Amount - armor.Amount);
+                    }
+                }
+            }
+            attackenemy = Math.Max(1, attackenemy);
+
+            var attackcounter = 0d;
+            foreach (var attack in counter.Attacks)
+            {
+                foreach (var armor in enemy.Armors)
+                {
+                    if (attack.Id == armor.Id)
+                    {
+                        attackcounter += Math.Max(0, attack.Amount - armor.Amount);
+                    }
+                }
+            }
+            attackcounter = Math.Max(1, attackcounter);
+
+            var enemyscore = Math.Ceiling(counter.Hitpoints / attackenemy) * enemy.ReloadTime;
+            var counterscore = Math.Ceiling(enemy.Hitpoints / attackcounter) * counter.ReloadTime;
+
+            enemyscore = 1d / Math.Max(1, enemyscore);
+            counterscore = 1d / Math.Max(1, counterscore);
+
+            var exp = enemy.Range > 2 ? 1.9 : 1.6;
+            enemyscore *= Math.Pow(1000d / enemy.Cost.Total, exp);
+
+            exp = counter.Range > 2 ? 1.9 : 1.6;
+            counterscore *= Math.Pow(1000d / counter.Cost.Total, exp);
+
+            return counterscore - enemyscore;
+        }
+
         public struct Counter
         {
             public readonly Unit EnemyUnit;
@@ -52,13 +95,8 @@ namespace Compiler
                 }
             }
 
-            return GetCounters(enemies, counters_by_age);
-        }
-
-        private List<Counter> GetCounters(List<Unit> enemies, Dictionary<int, List<Unit>> CountersByAge)
-        {
             UnitStats.Clear();
-            foreach (var unit in enemies.Concat(CountersByAge.Values.SelectMany(l => l)))
+            foreach (var unit in enemies.Concat(counters_by_age.Values.SelectMany(l => l)))
             {
                 UnitStats[unit] = new UnitStats(unit, null);
             }
@@ -72,9 +110,11 @@ namespace Compiler
                     var best_score = double.NegativeInfinity;
                     Counter current = new Counter();
 
-                    foreach (var counter in CountersByAge[age])
+                    foreach (var counter in counters_by_age[age])
                     {
-                        var score = GetScore(enemy, counter);
+                        var enemystats = UnitStats[enemy];
+                        var counterstats = UnitStats[counter];
+                        var score = GetScore(counterstats, enemystats);
                         if (score > best_score)
                         {
                             current = new Counter(enemy, age, counter);
@@ -93,52 +133,6 @@ namespace Compiler
             });
 
             return results;
-        }
-
-        private double GetScore(Unit enemy, Unit counter)
-        {
-            var enemystats = UnitStats[enemy];
-            var counterstats = UnitStats[counter];
-            
-            var attackenemy = 0d;
-            foreach (var attack in enemystats.Attacks)
-            {
-                foreach (var armor in counterstats.Armors)
-                {
-                    if (attack.Id == armor.Id)
-                    {
-                        attackenemy += Math.Max(0, attack.Amount - armor.Amount);
-                    }
-                }
-            }
-            attackenemy = Math.Max(1, attackenemy);
-            
-            var attackcounter = 0d;
-            foreach (var attack in counterstats.Attacks)
-            {
-                foreach (var armor in enemystats.Armors)
-                {
-                    if (attack.Id == armor.Id)
-                    {
-                        attackcounter += Math.Max(0, attack.Amount - armor.Amount);
-                    }
-                }
-            }
-            attackcounter = Math.Max(1, attackcounter);
-
-            var enemyscore = Math.Ceiling(counterstats.Hitpoints / attackenemy) * enemystats.ReloadTime;
-            var counterscore = Math.Ceiling(enemystats.Hitpoints / attackcounter) * counterstats.ReloadTime;
-
-            enemyscore = 1d / Math.Max(1, enemyscore);
-            counterscore = 1d / Math.Max(1, counterscore);
-
-            var exp = enemystats.Range > 2 ? 1.9 : 1.6;
-            enemyscore *= Math.Pow(1000d / enemystats.Cost.Total, exp);
-            
-            exp = counterstats.Range > 2 ? 1.9 : 1.6;
-            counterscore *= Math.Pow(1000d / counterstats.Cost.Total, exp);
-
-            return counterscore - enemyscore;
         }
     }
 }

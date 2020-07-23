@@ -9,6 +9,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using static Compiler.BuildOrderGenerator;
 using static Compiler.CounterGenerator;
@@ -385,16 +386,68 @@ namespace Compiler
         {
             ButtonTest.Enabled = false;
             Refresh();
+
             var settings = new Settings();
-            var mod = new Mod();
-            mod.Load(settings.DatFile);
 
             var sw = new Stopwatch();
             sw.Start();
 
-            var strategies = new Dictionary<Civilization, Strategy>();
-            AddBuildOrders(mod, strategies);
-            AddCounters(mod, strategies);
+            var mod = new Mod();
+            mod.Load(settings.DatFile);
+
+            var sb = new StringBuilder();
+
+            sb.AppendLine(";---- Auto generated ----");
+            sb.AppendLine("");
+
+            sb.AppendLine(";region Auto Counters");
+            sb.AppendLine("var gl-target-count = 0");
+            sb.AppendLine("var gl-current-count = 0");
+
+            var enemies = mod.Civilizations.SelectMany(c => c.TrainableUnits).Where(u => u.Land && u.Class != UnitClass.Civilian).Distinct().ToList();
+
+            foreach (var unit in enemies.OrderBy(u => u.Id))
+            {
+                sb.AppendLine("(defrule");
+                sb.AppendLine($"\t(strategic-number sn-auto-counters == YES)");
+                sb.AppendLine("=>");
+                sb.AppendLine($"\t(up-get-target-fact unit-type-count {unit.Id} gl-current-count)");
+                sb.AppendLine(")");
+
+                sb.AppendLine("(defrule");
+                sb.AppendLine($"\t(strategic-number sn-auto-counters == YES)");
+                sb.AppendLine($"\t(up-compare-goal gl-current-count g:> gl-target-count)");
+                sb.AppendLine($"\t(up-compare-goal gl-current-count c:>= 3)");
+                sb.AppendLine("=>");
+                sb.AppendLine($"\t(set-strategic-number sn-target-unit {unit.BaseUnit.Id})");
+                sb.AppendLine($"\t(up-modify-goal gl-target-count g:= gl-current-count)");
+                sb.AppendLine(")");
+            }
+
+            sb.AppendLine(";endregion");
+
+            var strategies = GetStrategies(mod);
+
+            foreach (var strat in strategies)
+            {
+                sb.AppendLine(strat.Value.Compile());
+            }
+
+            var name = Directory.GetFiles(settings.SourceFolder).Single(f => Path.GetExtension(f) == ".ai");
+            name = Path.GetFileNameWithoutExtension(name);
+            var folder = Path.Combine(settings.SourceFolder, name);
+            if (!Directory.Exists(folder))
+            {
+                Directory.CreateDirectory(folder);
+            }
+
+            var file = Path.Combine(folder, "Strategies.per");
+            File.WriteAllText(file, sb.ToString());
+
+            Log.Debug("compiling");
+            Compile(settings);
+
+            Log.Debug("done");
 
             sw.Stop();
             Log.Debug("time: " + sw.Elapsed.TotalSeconds);
@@ -402,162 +455,25 @@ namespace Compiler
             ButtonTest.Enabled = true;
         }
 
-        private void AddBuildOrders(Mod mod, Dictionary<Civilization, Strategy> strategies)
+        private Dictionary<Civilization, Strategy> GetStrategies(Mod mod)
         {
-            foreach (var civ in mod.Civilizations.Where(c => c.Id > 0))
+            Dictionary<Civilization, Strategy> results = new Dictionary<Civilization, Strategy>();
+
+            Parallel.ForEach(mod.Civilizations.Where(c => c.Id > 0), civ =>
+            //foreach (var civ in mod.Civilizations.Where(c => c.Id > 0))
             {
-                if (!strategies.ContainsKey(civ))
+                Log.Debug($"starting civ {civ.Id} {civ.Name}");
+
+                var strat = new Strategy(mod, civ);
+                strat.Generate();
+
+                lock (results)
                 {
-                    strategies.Add(civ, new Strategy());
+                    results.Add(civ, strat);
                 }
+            });
 
-                var strat = strategies[civ];
-
-                Log.Debug("");
-                Log.Debug($"---- {civ.Id} {civ.Name} ----");
-
-                var units = civ.Units
-                    .Where(u => u.Land)
-                    .Select(u => u.BaseUnit)
-                    .Where(u => u.Available || u.TechRequired)
-                    .Where(u => u.BuildLocation != null)
-                    .Where(u => u.Military)
-                    .Distinct()
-                    .ToList();
-
-                var bogen = new BuildOrderGenerator(civ);
-
-                foreach (var unit in units)
-                {
-                    var current = unit;
-
-                    if (current.GetAge(civ) <= 1)
-                    {
-                        var bestage = int.MaxValue;
-                        foreach (var upgr in unit.UpgradesTo)
-                        {
-                            var age = upgr.GetAge(civ);
-                            if (age > 1 && age < bestage)
-                            {
-                                current = upgr;
-                                bestage = age;
-                            }
-                        }
-                    }
-
-                    if (current.GetAge(civ) <= 1)
-                    {
-                        continue;
-                    }
-
-                    var good = false;
-                    switch (current.Class)
-                    {
-                        case UnitClass.Archer:
-                        case UnitClass.Ballista:
-                        case UnitClass.Cavalry:
-                        case UnitClass.CavalryArcher:
-                        case UnitClass.CavalryRaider:
-                        case UnitClass.Conquistador:
-                        case UnitClass.ElephantArcher:
-                        case UnitClass.HandCannoneer:
-                        case UnitClass.Infantry:
-                        case UnitClass.Monk:
-                        case UnitClass.Phalanx:
-                        case UnitClass.Pikeman:
-                        case UnitClass.Raider:
-                        case UnitClass.Scout:
-                        //case UnitClass.SiegeWeapon:
-                        case UnitClass.Spearman:
-                        case UnitClass.TwoHandedSwordsMan:
-                        //case UnitClass.PackedUnit:
-                        //case UnitClass.UnpackedSiegeUnit:
-                        case UnitClass.WarElephant: good = true; break;
-                    }
-
-                    if (!good)
-                    {
-                        continue;
-                    }
-
-                    var bo = bogen.GetBuildOrder(current, null, null, true, true, 100);
-
-                    if (bo != null && bo.Count <= 100)
-                    {
-                        Log.Debug("");
-                        Log.Debug($"found bo for {current.Id} {current.Name} with {bo.Count} elements");
-                        foreach (var be in bo)
-                        {
-                            Log.Debug(be.ToString());
-                        }
-
-                        strat.BuildOrders.Add(unit, bo);
-                    }
-                    else
-                    {
-                        Log.Debug($"no build order for {current.Id} {current.Name}");
-                    }
-                }
-            }
-        }
-
-        private void AddCounters(Mod mod, Dictionary<Civilization, Strategy> strategies)
-        {
-            var enemies = mod.Civilizations.SelectMany(c => c.TrainableUnits).Where(u => u.Land && u.Class != UnitClass.Civilian).Distinct().ToList();
-
-            foreach (var civ in mod.Civilizations.Where(c => c.Id > 0))
-            {
-                if (!strategies.ContainsKey(civ))
-                {
-                    strategies.Add(civ, new Strategy());
-                }
-
-                var strat = strategies[civ];
-
-                var counters = new HashSet<Unit>();
-                // get counters
-                foreach (var counter in strat.BuildOrders.Keys)
-                {
-                    counters.Add(counter);
-                    foreach (var upgr in counter.UpgradedFrom.Concat(counter.UpgradesTo))
-                    {
-                        if (upgr.GetAge(civ) >= 2)
-                        {
-                            counters.Add(upgr);
-                        }
-                    }
-                }
-
-                var cgen = new CounterGenerator(civ);
-                var cs = cgen.GetCounters(enemies, counters.ToList());
-
-                var baseunits = new HashSet<Unit>();
-                foreach (var unit in cs.Select(c => c.EnemyUnit))
-                {
-                    baseunits.Add(unit.BaseUnit);
-                }
-
-                foreach (var counter in cs.Where(c => baseunits.Contains(c.EnemyUnit)))
-                {
-                    if (strat.BuildOrders.ContainsKey(counter.CounterUnit))
-                    {
-                        strat.Counters.Add(counter);
-                    }
-                    else
-                    {
-                        foreach (var upgr in counter.CounterUnit.UpgradedFrom)
-                        {
-                            if (strat.BuildOrders.ContainsKey(upgr))
-                            {
-                                strat.Counters.Add(new Counter(counter.EnemyUnit, counter.Age, upgr));
-                                break;
-                            }
-                        }
-                    }
-                }
-
-                Log.Debug("found " + strat.Counters.Count + " counters");
-            }
+            return results;
         }
     }
 }

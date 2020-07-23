@@ -359,6 +359,8 @@ namespace Compiler
                 }
             }
 
+            InsertGatherers(best, primary, secondary, siege);
+
             return best;
         }
 
@@ -972,6 +974,69 @@ namespace Compiler
                     }
                 }
             }
+        }
+
+        private void InsertGatherers(List<BuildOrderElement> bo, Unit primary, Unit secondary, Unit siege)
+        {
+            var cost = new Cost();
+
+            var start = 0;
+            for (int i = 0; i < bo.Count; i++)
+            {
+                var current = bo[i];
+                if (current is ResearchBuildElement re)
+                {
+                    cost += re.Technology.GetCost(Civilization);
+                }
+                else if (current is BuildBuildElement be)
+                {
+                    cost += be.Unit.GetCost(Civilization);
+
+                    if (be.Unit == primary)
+                    {
+                        cost += be.Unit.GetCost(Civilization) * 20;
+                    }
+                }
+
+                bool age = false;
+                if (current.Category == BuildOrderElementCategory.AGE_UP)
+                {
+                    age = true;
+                }
+
+                if (i == bo.Count - 1)
+                {
+                    age = true;
+                }
+
+                if (age)
+                {
+                    var sum = cost.Total;
+                    var gatherers = new GatherersBuildElement(100 * cost.Food / sum, 100 * cost.Wood / sum, 100 * cost.Gold / sum, 100 * cost.Stone / sum);
+                    bo.Insert(start, gatherers);
+
+                    cost = new Cost();
+
+                    start = i + 2;
+                    i = start - 1;
+                }
+            }
+
+            var ucost = primary.GetCost(Civilization) * 10;
+            if (secondary != null)
+            {
+                ucost += secondary.GetCost(Civilization) * 5;
+            }
+            
+            if (siege != null)
+            {
+                ucost += siege.GetCost(Civilization);
+            }
+
+            var s = ucost.Total;
+            var gath = new GatherersBuildElement(100 * ucost.Food / s, 100 * ucost.Wood / s, 100 * ucost.Gold / s, 100 * ucost.Stone / s);
+
+            bo.Add(gath);
         }
     }
 }

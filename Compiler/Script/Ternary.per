@@ -40,8 +40,8 @@
 (defconst gl-cost-stone 462)
 (defconst gl-cost-gold 463)
 
-#defstrategic sn-min-food-gatherer = 7 ; minimum number of food gatherers
-#defstrategic sn-min-wood-gatherer = 3 ; minimum number of wood gatherers
+#defstrategic sn-min-food-gatherer = 0 ; minimum number of food gatherers
+#defstrategic sn-min-wood-gatherer = 0 ; minimum number of wood gatherers
 #defstrategic sn-min-gold-gatherer = 0 ; minimum number of gold gatherers
 #defstrategic sn-min-stone-gatherer = 0 ; minimum number of stone gatherers
 #defstrategic sn-percentage-extra-food = 0 ; percentage of extra villagers (over the minima above) that gets sent to food
@@ -130,6 +130,7 @@ sn-target-player-number = gl-target
 	
 	up-store-type-name s: sn-strategy
 	up-chat-data-to-self "Going for %s" c: 7031232
+	up-chat-data-to-self "With id %d" s: sn-strategy
 	
 #end-if
 
@@ -423,6 +424,14 @@ gl-cost-stone max= 500
 
 ;region Eco
 
+sn-min-food-gatherer = 7
+
+#if civilian-population > 7
+
+	sn-min-wood-gatherer = 3
+	
+#end-if
+
 var gl-civ
 up-get-fact civilian-population 0 gl-civ
 
@@ -475,7 +484,7 @@ sn-stone-gatherer-percentage = gl-stone
 	
 #end-if
 
-#if (building-type-count-total villager-production-building == 0) (can-build-with-escrow villager-production-building)
+#if (building-type-count-total villager-production-building < 2) (can-build-with-escrow villager-production-building)
 
 	up-release-escrow
 	build villager-production-building
@@ -483,7 +492,7 @@ sn-stone-gatherer-percentage = gl-stone
 	
 #end-if
 
-#if (housing-headroom < 10) (population-headroom > 0) (can-build housing-unit) (up-pending-objects c: housing-unit c:< 2)
+#if (housing-headroom < 5) (population-headroom > 0) (can-build housing-unit) (up-pending-objects c: housing-unit c:< 2)
 
 	up-build place-normal gl-with-escrow c: housing-unit
 	
