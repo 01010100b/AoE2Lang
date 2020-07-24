@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Net;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 using static Compiler.BuildOrderGenerator.BuildOrderElement;
@@ -12,6 +13,24 @@ namespace Compiler
 {
     class BuildOrderGenerator
     {
+        public class BuildOrder
+        {
+            public readonly Civilization Civilization;
+            public readonly Unit Primary;
+            public readonly Unit Secondary;
+            public readonly Unit Siege;
+            public readonly List<BuildOrderElement> Elements;
+
+            public BuildOrder(Civilization civilization, Unit primary, Unit secondary, Unit siege)
+            {
+                Civilization = civilization;
+                Primary = primary;
+                Secondary = secondary;
+                Siege = siege;
+                Elements = new List<BuildOrderElement>();
+            }
+
+        }
         public abstract class BuildOrderElement
         {
             public enum BuildOrderElementCategory
@@ -251,7 +270,7 @@ namespace Compiler
             Random = new Random(DateTime.UtcNow.Ticks.GetHashCode() ^ Guid.NewGuid().GetHashCode() ^ civilization.Id.GetHashCode());
         }
 
-        public List<BuildOrderElement> GetBuildOrder(Unit primary, Unit secondary, Unit siege, bool upgrades, bool eco, int attempts)
+        public BuildOrder GetBuildOrder(Unit primary, Unit secondary, Unit siege, bool upgrades, bool eco, int attempts)
         {
             if (primary == null)
             {
@@ -361,7 +380,10 @@ namespace Compiler
 
             InsertGatherers(best, primary, secondary, siege);
 
-            return best;
+            var result = new BuildOrder(Civilization, primary, secondary, siege);
+            result.Elements.AddRange(best);
+
+            return result;
         }
 
         private void SolveUnit(Unit unit)
@@ -653,6 +675,7 @@ namespace Compiler
 
             const int AGE_COST = 100;
             const int ECO_COST = 150;
+            const int BUILDING_COST = 175;
             const int UNIT_STATUPGRADE_COST = 200;
             const int UNIT_UPGRADE_COST = 300;
             const int UNIT_TRAINSITE_COST = 400;
@@ -757,6 +780,14 @@ namespace Compiler
                         case BuildOrderElementCategory.WOOD_DROPSITE: cost = DROPSITE_COST + 30; break;
                         case BuildOrderElementCategory.GOLD_DROPSITE: cost = DROPSITE_COST + 10; break;
                         case BuildOrderElementCategory.STONE_DROPSITE: cost = DROPSITE_COST; break;
+                    }
+
+                    if (be.Category == BuildOrderElementCategory.NONE && be is BuildBuildElement bbe)
+                    {
+                        if (bbe.Unit.Type == 80)
+                        {
+                            cost = BUILDING_COST;
+                        }
                     }
 
                     if (cost > best_cost)
@@ -868,7 +899,7 @@ namespace Compiler
                             }
                         }
                     }
-                    else if (siege != null && UnitUpgrades[primary].Contains(re.Technology))
+                    else if (siege != null && UnitUpgrades[siege].Contains(re.Technology))
                     {
                         foreach (var command in re.Technology.Effect.Commands)
                         {

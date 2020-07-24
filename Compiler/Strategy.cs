@@ -14,7 +14,7 @@ namespace Compiler
     {
         public readonly Mod Mod;
         public readonly Civilization Civilization;
-        public readonly Dictionary<Unit, List<BuildOrderElement>> BuildOrders = new Dictionary<Unit, List<BuildOrderElement>>();
+        public readonly Dictionary<Unit, BuildOrder> BuildOrders = new Dictionary<Unit, BuildOrder>();
         public readonly List<Counter> Counters = new List<Counter>();
 
         public Strategy(Mod mod, Civilization civilization)
@@ -39,6 +39,23 @@ namespace Compiler
                 .Where(u => u.Military)
                 .Distinct()
                 .ToList();
+
+            var best_siege = units.First();
+            var best_siege_score = double.MinValue;
+            foreach (var siege in units.Where(u => u.Class == UnitClass.SiegeWeapon))
+            {
+                var score = (double)siege.BaseAttacks.Where(a => a.Id == 11 || a.Id == 21 || a.Id == 26).Sum(a => a.Amount);
+                score /= Math.Max(1, siege.BaseReloadTime);
+                score /= Math.Max(1, siege.BaseCost.Total);
+
+                //Log.Debug($"siege {siege.Id} {siege.Name} score {score}");
+
+                if (score > best_siege_score)
+                {
+                    best_siege = siege;
+                    best_siege_score = score;
+                }
+            }
 
             var bogen = new BuildOrderGenerator(Civilization);
 
@@ -95,13 +112,13 @@ namespace Compiler
                     continue;
                 }
 
-                var bo = bogen.GetBuildOrder(current, null, null, true, true, 100);
+                var bo = bogen.GetBuildOrder(current, null, best_siege, true, true, 100);
 
-                if (bo != null && bo.Count <= 100)
+                if (bo != null && bo.Elements.Count <= 100)
                 {
                     //Log.Debug("");
-                    //Log.Debug($"found bo for {current.Id} {current.Name} with {bo.Count} elements");
-                    foreach (var be in bo)
+                    //Log.Debug($"found bo for {current.Id} {current.Name} with {bo.Elements.Count} elements");
+                    foreach (var be in bo.Elements)
                     {
                         //Log.Debug(be.ToString());
                     }
@@ -215,8 +232,26 @@ namespace Compiler
 
                 var bo = BuildOrders[unit];
 
+                if (bo.Secondary != null)
+                {
+                    sb.AppendLine($"sn-secondary-unit = {bo.Secondary.BaseUnit.Id}");
+                }
+                else
+                {
+                    sb.AppendLine($"sn-secondary-unit = OFF");
+                }
+
+                if (bo.Siege != null)
+                {
+                    sb.AppendLine($"sn-siege-unit = {bo.Siege.BaseUnit.Id}");
+                }
+                else
+                {
+                    sb.AppendLine($"sn-siege-unit = OFF");
+                }
+
                 var index = 1;
-                foreach (var e in bo)
+                foreach (var e in bo.Elements)
                 {
                     if (e is GatherersBuildElement ge)
                     {

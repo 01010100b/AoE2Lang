@@ -28,6 +28,40 @@ namespace Compiler
             Application.Run(new Form1());
         }
 
+        public static void CopyFolder(string from, string to)
+        {
+            if (!Directory.Exists(to))
+            {
+                Directory.CreateDirectory(to);
+            }
+
+            var queue = new Queue<string>();
+            queue.Enqueue(from);
+
+            while (queue.Count > 0)
+            {
+                var current = queue.Dequeue();
+
+                var rel = current.Replace(from, "");
+                var outdir = to + rel;
+                if (!Directory.Exists(outdir))
+                {
+                    Directory.CreateDirectory(outdir);
+                }
+
+                foreach (var file in Directory.GetFiles(current))
+                {
+                    var outfile = Path.Combine(outdir, Path.GetFileName(file));
+                    File.Copy(file, outfile, true);
+                }
+
+                foreach (var dir in Directory.GetDirectories(current))
+                {
+                    queue.Enqueue(dir);
+                }
+            }
+        }
+
         internal static void Test()
         {
             const int CIV = 11;

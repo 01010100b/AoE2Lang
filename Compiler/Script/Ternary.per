@@ -543,31 +543,35 @@ gl-mill max= 1
 
 ;region Attack
 
-#if (sn-primary-unit != OFF)
+#foreach $unit in primary-unit secondary-unit siege-unit
 
-	var gl-unit
-	up-get-object-type-data s: sn-primary-unit object-data-type gl-unit
+	#if (sn-$unit != OFF)
+
+		var gl-unit
+		up-get-object-type-data s: sn-$unit object-data-type gl-unit
 	
-	#if up-can-train gl-without-escrow g: gl-unit
+		#if up-can-train gl-without-escrow g: gl-unit
 	
-		up-train gl-without-escrow g: gl-unit
+			up-train gl-without-escrow g: gl-unit
 		
-	#end-if
-	
-	#if (timer-triggered ti-repeat-1m) (not (up-train-site-ready g: gl-unit))
-	
-		var gl-train-site
-		up-get-object-type-data g: gl-unit object-data-train-site gl-train-site
-		
-		#if (up-can-build gl-with-escrow g: gl-train-site) (up-object-type-count-total g: gl-train-site c:> 0)
-		
-			up-build place-normal gl-with-escrow g: gl-train-site
-			
 		#end-if
+	
+		#if (timer-triggered ti-repeat-1m) (not (up-train-site-ready g: gl-unit))
+	
+			var gl-train-site
+			up-get-object-type-data g: gl-unit object-data-train-site gl-train-site
 		
+			#if (up-can-build gl-with-escrow g: gl-train-site) (up-object-type-count-total g: gl-train-site c:> 0)
+		
+				up-build place-normal gl-with-escrow g: gl-train-site
+			
+			#end-if
+		
+		#end-if
+
 	#end-if
 
-#end-if
+#end-foreach
 
 var gl-target-mil
 up-get-target-fact military-population 0 gl-target-mil
