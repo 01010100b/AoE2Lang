@@ -35,6 +35,23 @@ namespace Compiler
             ButtonCompile.Enabled = false;
             Refresh();
 
+            Compile(true);
+
+            ButtonCompile.Enabled = true;
+        }
+
+        private void ButtonTest_Click(object sender, EventArgs e)
+        {
+            ButtonTest.Enabled = false;
+            Refresh();
+
+            Compile(false);
+
+            ButtonTest.Enabled = true;
+        }
+
+        private void Compile(bool parallel)
+        {
             var settings = new Settings();
 
             var sw = new Stopwatch();
@@ -76,19 +93,50 @@ namespace Compiler
 
             Dictionary<Civilization, Strategy> strategies = new Dictionary<Civilization, Strategy>();
 
-            Parallel.ForEach(mod.Civilizations.Where(c => c.Id > 0), civ =>
-            //foreach (var civ in mod.Civilizations.Where(c => c.Id > 0))
+            if (parallel)
             {
-                Log.Debug($"starting civ {civ.Id} {civ.Name}");
-
-                var strat = new Strategy(mod, civ);
-                strat.Generate();
-
-                lock (strategies)
+                Parallel.ForEach(mod.Civilizations.Where(c => c.Id > 0), civ =>
                 {
-                    strategies.Add(civ, strat);
+                    Log.Debug($"starting civ {civ.Id} {civ.Name}");
+
+                    var strat = new Strategy(mod, civ);
+                    strat.Generate();
+
+                    lock (strategies)
+                    {
+                        strategies.Add(civ, strat);
+                    }
+                });
+            }
+            else
+            {
+                foreach (var civ in mod.Civilizations.Where(c => c.Id > 0))
+                {
+                    Log.Debug($"starting civ {civ.Id} {civ.Name}");
+
+                    var strat = new Strategy(mod, civ);
+                    strat.Generate();
+
+                    lock (strategies)
+                    {
+                        strategies.Add(civ, strat);
+                    }
+
+                    foreach (var bo in strat.BuildOrders.Values)
+                    {
+                        var current = bo.Primary;
+
+                        Log.Debug("");
+                        Log.Debug($"found bo for {current.Id} {current.Name} with {bo.Elements.Count} elements");
+                        foreach (var be in bo.Elements)
+                        {
+                            Log.Debug(be.ToString());
+                        }
+                    }
+
+                    
                 }
-            });
+            }
 
             foreach (var strat in strategies)
             {
@@ -127,18 +175,6 @@ namespace Compiler
 
             sw.Stop();
             Log.Debug("time: " + sw.Elapsed.TotalSeconds);
-
-            ButtonCompile.Enabled = true;
-        }
-
-        private void ButtonTest_Click(object sender, EventArgs e)
-        {
-            ButtonTest.Enabled = false;
-            Refresh();
-
-            
-
-            ButtonTest.Enabled = true;
         }
     }
 }

@@ -116,18 +116,7 @@ namespace Compiler
 
                 if (bo != null && bo.Elements.Count <= 100)
                 {
-                    //Log.Debug("");
-                    //Log.Debug($"found bo for {current.Id} {current.Name} with {bo.Elements.Count} elements");
-                    foreach (var be in bo.Elements)
-                    {
-                        //Log.Debug(be.ToString());
-                    }
-
                     BuildOrders.Add(unit, bo);
-                }
-                else
-                {
-                    //Log.Debug($"no build order for {current.Id} {current.Name}");
                 }
             }
         }

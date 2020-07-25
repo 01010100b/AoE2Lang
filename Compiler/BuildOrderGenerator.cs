@@ -160,6 +160,7 @@ namespace Compiler
         }
 
         public readonly Civilization Civilization;
+        public bool AddMonk { get; set; } = true;
 
         private readonly Dictionary<Unit, UnitStats> PossibleUnits = new Dictionary<Unit, UnitStats>();
         private readonly Dictionary<Technology, TechnologyStats> PossibleTechnologies = new Dictionary<Technology, TechnologyStats>();
@@ -181,10 +182,12 @@ namespace Compiler
 
             PossibleUnits.Clear();
             UnitUpgrades.Clear();
+            UnitMakeAvailableTechnologies.Clear();
             foreach (var unit in civilization.Units.Where(u => u.Available || u.TechRequired).Where(u => u.Land))
             {
                 PossibleUnits.Add(unit, new UnitStats(unit, null));
                 UnitUpgrades.Add(unit, new HashSet<Technology>());
+                UnitMakeAvailableTechnologies.Add(unit, new HashSet<Technology>());
             }
 
             PossibleTechnologies.Clear();
@@ -193,7 +196,7 @@ namespace Compiler
                 PossibleTechnologies.Add(tech, new TechnologyStats(tech, null));
             }
 
-            UnitMakeAvailableTechnologies.Clear();
+            
             EcoUpgrades.Clear();
 
             var vills = Civilization.Units.Where(u => u.Class == UnitClass.Civilian).ToList();
@@ -223,11 +226,6 @@ namespace Compiler
                         var unit = PossibleUnits.Keys.FirstOrDefault(u => u.Id == uc.ToUnitId);
                         if (unit != null)
                         {
-                            if (!UnitMakeAvailableTechnologies.ContainsKey(unit))
-                            {
-                                UnitMakeAvailableTechnologies.Add(unit, new HashSet<Technology>());
-                            }
-
                             UnitMakeAvailableTechnologies[unit].Add(tech);
                         }
 
@@ -278,6 +276,7 @@ namespace Compiler
             }
 
             var starting_techs = new List<Technology>() { Civilization.Age1Tech };
+            var monk = Civilization.TrainableUnits.FirstOrDefault(u => u.Class == UnitClass.Monk);
 
             var best = new List<BuildOrderElement>();
             var best_cost = double.MaxValue;
@@ -362,6 +361,16 @@ namespace Compiler
                         {
                             current.AddRange(bo);
                         }
+                    }
+                }
+
+                if (AddMonk == true && monk != null)
+                {
+                    SolveUnit(monk);
+
+                    if (SolvedUnits.TryGetValue(monk, out List<BuildOrderElement> bo))
+                    {
+                        current.AddRange(bo);
                     }
                 }
 
@@ -784,10 +793,7 @@ namespace Compiler
 
                     if (be.Category == BuildOrderElementCategory.NONE && be is BuildBuildElement bbe)
                     {
-                        if (bbe.Unit.Type == 80)
-                        {
-                            cost = BUILDING_COST;
-                        }
+                        cost = BUILDING_COST;
                     }
 
                     if (cost > best_cost)
@@ -851,7 +857,8 @@ namespace Compiler
                     {
                         be.Category = BuildOrderElementCategory.ECO_UPGR;
                     }
-                    else if (primary != null && UnitUpgrades[primary].Contains(re.Technology))
+                    else if (primary != null && 
+                        (UnitUpgrades[primary].Contains(re.Technology) || UnitMakeAvailableTechnologies[primary].Contains(re.Technology)))
                     {
                         foreach (var command in re.Technology.Effect.Commands)
                         {
@@ -875,7 +882,8 @@ namespace Compiler
                             }
                         }
                     }
-                    else if (secondary != null && UnitUpgrades[secondary].Contains(re.Technology))
+                    else if (secondary != null &&
+                        (UnitUpgrades[secondary].Contains(re.Technology) || UnitMakeAvailableTechnologies[secondary].Contains(re.Technology)))
                     {
                         foreach (var command in re.Technology.Effect.Commands)
                         {
@@ -899,7 +907,8 @@ namespace Compiler
                             }
                         }
                     }
-                    else if (siege != null && UnitUpgrades[siege].Contains(re.Technology))
+                    else if (siege != null &&
+                        (UnitUpgrades[siege].Contains(re.Technology) || UnitMakeAvailableTechnologies[siege].Contains(re.Technology)))
                     {
                         foreach (var command in re.Technology.Effect.Commands)
                         {
