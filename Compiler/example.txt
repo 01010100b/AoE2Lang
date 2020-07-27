@@ -1,13 +1,18 @@
 ﻿int a
 int a2_sdf75___sd_
 
-int 1a
 int _a
-bool b
-sdc fddf
-qsdint sss
+int b
 
 int get1()
+{
+	int c
+	a = _push(b)
+	a = _pop()
+}
 
-a = _push(b)
-a = _pop()
+int get2(int par)
+{
+	int ddd
+	ddd = _push(par)
+}

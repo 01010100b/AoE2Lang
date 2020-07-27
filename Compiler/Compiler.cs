@@ -9,13 +9,89 @@ namespace Compiler
 {
     class Compiler
     {
-        public readonly string[] INTRINSICS = { "_push", "_pop" };
+        private static List<string> INTRINSICS => GetInstrinsics().Select(i => i.Name).ToList();
+
+        public static List<Function> GetInstrinsics()
+        {
+            var int_type = Types.BuiltinTypes.Single(t => t.Name == "int");
+
+            var intrinsics = new List<Function>();
+
+            var intr = new Function()
+            {
+                ReturnType = int_type,
+                Name = "_push",
+                Parameters = new List<Variable>() { new Variable() { Type = int_type, Name = "e" } }
+            };
+            intrinsics.Add(intr);
+
+            intr = new Function()
+            {
+                ReturnType = int_type,
+                Name = "_pop",
+                Parameters = new List<Variable>()
+            };
+            intrinsics.Add(intr);
+
+            return intrinsics;
+        }
+
+        public int RegistersUsed { get; private set; } = 0;
 
         public void Compile(Script script)
         {
+            script.Functions.RemoveAll(f => INTRINSICS.Contains(f.Name));
+
+            AssignRegisters(script);
+
             foreach (var function in script.Functions)
             {
                 CompileBlock(function.Block);
+            }
+        }
+
+        private void AssignRegisters(Script script)
+        {
+            var next_register = 0;
+
+            foreach (var global in script.GlobalVariables)
+            {
+                global.Register = next_register;
+                next_register++;
+
+                RegistersUsed = Math.Max(RegistersUsed, next_register);
+            }
+
+            foreach (var function in script.Functions)
+            {
+                foreach (var parameter in function.Parameters)
+                {
+                    parameter.Register = next_register;
+                    next_register++;
+
+                    RegistersUsed = Math.Max(RegistersUsed, next_register);
+                }
+
+                AssignRegisters(function.Block, next_register);
+            }
+        }
+
+        private void AssignRegisters(Block block, int next_register)
+        {
+            foreach (var local in block.LocalVariables)
+            {
+                local.Register = next_register;
+                next_register++;
+
+                RegistersUsed = Math.Max(RegistersUsed, next_register);
+            }
+
+            foreach (var element in block.Elements)
+            {
+                if (element is Block b)
+                {
+                    AssignRegisters(b, next_register);
+                }
             }
         }
 
@@ -25,18 +101,17 @@ namespace Compiler
             {
                 if (block.Elements[i] is CallStatement call)
                 {
-                    Log.Debug("intr: " + call.Function.Name);
-                    var rules = new List<RuleStatement>();
+                    Log.Debug("call: " + call.Function.Name);
 
                     if (INTRINSICS.Contains(call.Function.Name))
                     {
-                        rules = CompileIntrinsic(call);
+                        var rules = CompileIntrinsic(call);
+
+                        block.Elements.RemoveAt(i);
+                        block.Elements.InsertRange(i, rules);
+
+                        i += rules.Count - 1;
                     }
-
-                    block.Elements.RemoveAt(i);
-                    block.Elements.InsertRange(i, rules);
-
-                    i += rules.Count - 1;
                 }
             }
         }

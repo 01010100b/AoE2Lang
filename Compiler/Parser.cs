@@ -38,6 +38,13 @@ namespace Compiler
             DefinedFunctions.Clear();
             GlobalVariables.Clear();
 
+            // intrinsic functions
+
+            foreach (var intr in Compiler.GetInstrinsics())
+            {
+                DefinedFunctions.Add(intr.Name, intr);
+            }
+
             // get types
 
             foreach (var type in Types.BuiltinTypes)
@@ -62,6 +69,13 @@ namespace Compiler
             foreach (var kvp in source_files)
             {
                 ParseDefinitions(kvp.Key, kvp.Value);
+            }
+
+            // parse statements
+
+            foreach (var kvp in source_files)
+            {
+                ParseStatements(kvp.Key, kvp.Value);
             }
 
             // output script
@@ -160,6 +174,152 @@ namespace Compiler
                     }
 
                     height--;
+                }
+            }
+        }
+
+        private void ParseStatements(string file, string source)
+        {
+            var lines = source.Split('\n').Where(l => l != "\r").ToList();
+
+            var variable_regex = GetStatementRegex(VariableDeclarationPattern);
+            var function_regex = GetStatementRegex(FunctionDeclarationPattern);
+            var call_regex = GetStatementRegex(FunctionCallPattern);
+
+            Function current_function = null;
+            Block current_block = null;
+            Stack<Block> block_stack = new Stack<Block>();
+            bool entered = false;
+
+            for (int i = 0; i < lines.Count; i++)
+            {
+                var line = lines[i].Trim();
+
+                if (line.Length == 0)
+                {
+                    continue;
+                }
+
+                if (variable_regex.IsMatch(line))
+                {
+                    var m = variable_regex.Match(line);
+                    
+                    var variable = new Variable()
+                    {
+                        Type = DefinedTypes[m.Groups["Type"].Value],
+                        Name = m.Groups["Name"].Value
+                    };
+
+                    if (current_block != null && entered == true)
+                    {
+                        var defined = GlobalVariables.Values.ToList();
+                        defined.AddRange(current_function.Parameters);
+                        defined.AddRange(current_block.LocalVariables);
+                        defined.AddRange(block_stack.SelectMany(b => b.LocalVariables));
+
+                        if (defined.Select(v => v.Name).Contains(variable.Name))
+                        {
+                            throw new ParserException(file, i, "variable already defined: " + line);
+                        }
+
+                        Log.Debug("decl: " + line);
+                        current_block.LocalVariables.Add(variable);
+                    }
+                    else if (!GlobalVariables.ContainsKey(variable.Name))
+                    {
+                        throw new ParserException(file, i, "variable declaration unexpected: " + line);
+                    }
+                }
+                else if (function_regex.IsMatch(line))
+                {
+                    var m = function_regex.Match(line);
+
+                    var name = m.Groups["Name"].Value;
+                    current_function = DefinedFunctions[name];
+                    current_block = current_function.Block;
+
+                    entered = false;
+
+                    if (line.Contains("{"))
+                    {
+                        entered = true;
+                    }
+                }
+                else if (call_regex.IsMatch(line))
+                {
+                    if (entered == false)
+                    {
+                        throw new ParserException(file, i, "unexpected statement: " + line);
+                    }
+
+                    var m = call_regex.Match(line);
+                    var result_name = m.Groups["Result"].Value;
+                    var function_name = m.Groups["Name"].Value;
+                    var parameter_names = m.Groups["Params"].Value.Replace("(", "").Replace(")", "").Split(',')
+                        .Select(p => p.Trim()).Where(p => p.Length > 0).ToList();
+
+                    var variables = GlobalVariables.Values.ToList();
+                    variables.AddRange(current_function.Parameters);
+                    variables.AddRange(current_block.LocalVariables);
+                    variables.AddRange(block_stack.SelectMany(b => b.LocalVariables));
+
+                    var result = variables.Single(v => v.Name == result_name);
+                    var function = DefinedFunctions[function_name];
+
+                    var parameters = new List<Variable>();
+                    foreach (var pn in parameter_names)
+                    {
+                        var parameter = variables.FirstOrDefault(v => v.Name == pn);
+
+                        if (parameter == null)
+                        {
+                            throw new ParserException(file, i, $"parameter {pn} not found: {line}");
+                        }
+
+                        parameters.Add(parameter);
+                    }
+
+                    var statement = new CallStatement()
+                    {
+                        Result = result,
+                        Function = function,
+                        Parameters = parameters
+                    };
+
+                    current_block.Elements.Add(statement);
+                }
+                else if (line == "{")
+                {
+                    if (entered)
+                    {
+                        throw new ParserException(file, i, "did not expect {");
+                    }
+
+                    entered = true;
+                }
+                else if (line == "}")
+                {
+                    if (!entered)
+                    {
+                        throw new ParserException(file, i, "did not expect }");
+                    }
+
+                    if (block_stack.Count > 0)
+                    {
+                        current_block = block_stack.Pop();
+                    }
+                    else if (current_function != null)
+                    {
+                        current_function = null;
+                    }
+                    else
+                    {
+                        throw new ParserException(file, i, "did not expect }");
+                    }
+                }
+                else
+                {
+                    throw new ParserException(file, i, "parser error: " + line);
                 }
             }
         }

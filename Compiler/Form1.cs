@@ -1,4 +1,5 @@
-﻿using Compiler.Mods;
+﻿using Compiler.Lang;
+using Compiler.Mods;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -175,6 +176,58 @@ namespace Compiler
 
             sw.Stop();
             Log.Debug("time: " + sw.Elapsed.TotalSeconds);
+        }
+
+        private void ButtonCompilerTest_Click(object sender, EventArgs e)
+        {
+            ButtonCompilerTest.Enabled = false;
+            Refresh();
+
+            var file = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "example.txt");
+            var sources = new Dictionary<string, string>();
+            sources.Add("example.txt", File.ReadAllText(file));
+
+            var parser = new Parser();
+            var script = parser.Parse(sources);
+
+            var compiler = new Compiler();
+            compiler.Compile(script);
+
+            foreach (var global in script.GlobalVariables)
+            {
+                Log.Debug($"global: {global.Type.Name} {global.Name} reg {global.Register}");
+            }
+
+            foreach (var function in script.Functions)
+            {
+                Log.Debug($"function: {function.ReturnType.Name} {function.Name}");
+                foreach (var par in function.Parameters)
+                {
+                    Log.Debug($"par {par.Type.Name} {par.Name} reg {par.Register}");
+                }
+
+                var blocks = new Stack<Block>();
+                blocks.Push(function.Block);
+
+                while (blocks.Count > 0)
+                {
+                    var block = blocks.Pop();
+                    foreach (var local in block.LocalVariables)
+                    {
+                        Log.Debug($"local {local.Type.Name} {local.Name} reg {local.Register}");
+                    }
+
+                    foreach (var element in block.Elements)
+                    {
+                        if (element is Block b)
+                        {
+                            blocks.Push(b);
+                        }
+                    }
+                }
+            }
+
+            ButtonCompilerTest.Enabled = true;
         }
     }
 }
