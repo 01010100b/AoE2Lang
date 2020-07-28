@@ -36,12 +36,17 @@ namespace Compiler
             return intrinsics;
         }
 
-        public int RegistersUsed { get; private set; } = 0;
+        public int GlobalVariablesOffset { get; private set; } = -1;
+        public int GlobalVariablesSize { get; private set; } = 0;
+        public int RegistersOffset { get; private set; } = -1;
+        public int RegistersSize { get; private set; } = 0;
+        private readonly Dictionary<Variable, int> AssignedRegisters = new Dictionary<Variable, int>();
 
         public void Compile(Script script)
         {
             script.Functions.RemoveAll(f => INTRINSICS.Contains(f.Name));
 
+            AssignedRegisters.Clear();
             AssignRegisters(script);
 
             foreach (var function in script.Functions)
@@ -56,20 +61,21 @@ namespace Compiler
 
             foreach (var global in script.GlobalVariables)
             {
-                global.Register = next_register;
+                AssignedRegisters.Add(global, next_register);
                 next_register++;
 
-                RegistersUsed = Math.Max(RegistersUsed, next_register);
+                RegistersSize = Math.Max(RegistersSize, next_register);
+                GlobalVariablesSize += global.Type.Size;
             }
 
             foreach (var function in script.Functions)
             {
                 foreach (var parameter in function.Parameters)
                 {
-                    parameter.Register = next_register;
+                    AssignedRegisters.Add(parameter, next_register);
                     next_register++;
 
-                    RegistersUsed = Math.Max(RegistersUsed, next_register);
+                    RegistersSize = Math.Max(RegistersSize, next_register);
                 }
 
                 AssignRegisters(function.Block, next_register);
@@ -80,10 +86,10 @@ namespace Compiler
         {
             foreach (var local in block.LocalVariables)
             {
-                local.Register = next_register;
+                AssignedRegisters.Add(local, next_register);
                 next_register++;
 
-                RegistersUsed = Math.Max(RegistersUsed, next_register);
+                RegistersSize = Math.Max(RegistersSize, next_register);
             }
 
             foreach (var element in block.Elements)
@@ -116,7 +122,7 @@ namespace Compiler
             }
         }
 
-        private List<RuleStatement> CompileIntrinsic(CallStatement call)
+        private List<Statement> CompileIntrinsic(CallStatement call)
         {
             if (call.Function.Name == "_push")
             {
@@ -125,7 +131,7 @@ namespace Compiler
                 rule += $"\n\t(up-modify-goal stack-pointer c:+ 1)";
                 rule += "\n)";
 
-                return new List<RuleStatement>() { new RuleStatement() { Rule = rule } };
+                return new List<Statement>() { new RuleStatement() { Rule = rule } };
             }
             else if (call.Function.Name == "_pop")
             {
@@ -134,7 +140,7 @@ namespace Compiler
                 rule += $"\n\t(up-get-indirect-goal g: stack-pointer g: {call.Result.Name})";
                 rule += "\n)";
 
-                return new List<RuleStatement>() { new RuleStatement() { Rule = rule } };
+                return new List<Statement>() { new RuleStatement() { Rule = rule } };
             }
             else
             {

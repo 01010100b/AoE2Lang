@@ -85,6 +85,8 @@
 	(set-strategic-number sn-enable-patrol-attack 1)
 	(set-strategic-number sn-enable-new-building-system 1)
 	(set-strategic-number sn-wall-targeting-mode 1)
+	(set-difficulty-parameter ability-to-maintain-distance 1)
+	(set-difficulty-parameter ability-to-dodge-missiles 1)
 	(disable-self)
 )
 
@@ -559,7 +561,7 @@ gl-mill max= 1
 			var gl-train-site
 			up-get-object-type-data g: gl-unit object-data-train-site gl-train-site
 		
-			#if (up-can-build gl-with-escrow g: gl-train-site) (up-object-type-count-total g: gl-train-site c:> 0)
+			#if (up-can-build gl-with-escrow g: gl-train-site) (up-object-type-count-total g: gl-train-site c:> 0) (up-pending-objects g: gl-train-site)
 		
 				up-build place-normal gl-with-escrow g: gl-train-site
 			

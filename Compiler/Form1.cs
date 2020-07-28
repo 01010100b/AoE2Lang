@@ -184,8 +184,10 @@ namespace Compiler
             Refresh();
 
             var file = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "example.txt");
-            var sources = new Dictionary<string, string>();
-            sources.Add("example.txt", File.ReadAllText(file));
+            var sources = new Dictionary<string, string>
+            {
+                { "example.txt", File.ReadAllText(file) }
+            };
 
             var parser = new Parser();
             var script = parser.Parse(sources);
@@ -195,7 +197,7 @@ namespace Compiler
 
             foreach (var global in script.GlobalVariables)
             {
-                Log.Debug($"global: {global.Type.Name} {global.Name} reg {global.Register}");
+                Log.Debug($"global: {global.Type.Name} {global.Name}");
             }
 
             foreach (var function in script.Functions)
@@ -203,27 +205,7 @@ namespace Compiler
                 Log.Debug($"function: {function.ReturnType.Name} {function.Name}");
                 foreach (var par in function.Parameters)
                 {
-                    Log.Debug($"par {par.Type.Name} {par.Name} reg {par.Register}");
-                }
-
-                var blocks = new Stack<Block>();
-                blocks.Push(function.Block);
-
-                while (blocks.Count > 0)
-                {
-                    var block = blocks.Pop();
-                    foreach (var local in block.LocalVariables)
-                    {
-                        Log.Debug($"local {local.Type.Name} {local.Name} reg {local.Register}");
-                    }
-
-                    foreach (var element in block.Elements)
-                    {
-                        if (element is Block b)
-                        {
-                            blocks.Push(b);
-                        }
-                    }
+                    Log.Debug($"par {par.Type.Name} {par.Name}");
                 }
             }
 
