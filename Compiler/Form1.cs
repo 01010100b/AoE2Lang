@@ -20,12 +20,6 @@ namespace Compiler
 {
     public partial class Form1 : Form
     {
-        private class OldStrategy
-        {
-            public readonly List<Counter> Counters = new List<Counter>();
-            public readonly Dictionary<Unit, OldBuildOrder> BuildOrders = new Dictionary<Unit, OldBuildOrder>();
-
-        }
         public Form1()
         {
             InitializeComponent();

@@ -571,7 +571,7 @@ gl-mill max= 1
 			var gl-train-site
 			up-get-object-type-data g: gl-unit object-data-train-site gl-train-site
 		
-			#if (up-can-build gl-with-escrow g: gl-train-site) (up-object-type-count-total g: gl-train-site c:> 0) (up-pending-objects g: gl-train-site)
+			#if (up-can-build gl-with-escrow g: gl-train-site) (up-object-type-count-total g: gl-train-site c:> 0) (up-pending-objects g: gl-train-site c:== 0)
 		
 				up-build place-normal gl-with-escrow g: gl-train-site
 			
