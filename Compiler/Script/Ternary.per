@@ -19,6 +19,10 @@
 (defconst food-generating-unit farm)
 (defconst trading-building market)
 (defconst villager-production-building town-center)
+(defconst foodies-per-tc 7)
+(defconst woodies-per-tc 4)
+(defconst goldies-per-tc 0)
+(defconst stonies-per-tc 0)
 
 #defglobal gl-with-escrow = with-escrow
 #defglobal gl-without-escrow = without-escrow
@@ -98,8 +102,9 @@
 	(set-strategic-number sn-maximum-gold-drop-distance 50)
 	(set-strategic-number sn-maximum-stone-drop-distance 50)
 	(set-strategic-number sn-initial-exploration-required 0)
-	(set-strategic-number sn-unexplored-construction 1)
-	(set-strategic-number sn-town-center-placement wood-dropsite)
+	(set-strategic-number sn-percent-exploration-required 0)
+	;(set-strategic-number sn-unexplored-construction 1)
+	;(set-strategic-number sn-town-center-placement wood-dropsite)
 	(disable-self)
 )
 
@@ -234,7 +239,6 @@ up-setup-cost-data 1 gl-cost-food
 					
 					#if up-can-research gl-with-escrow g: gl-current
 					
-						up-release-escrow
 						up-research gl-with-escrow g: gl-current
 						
 						up-store-tech-name g: gl-current
@@ -278,7 +282,6 @@ up-setup-cost-data 1 gl-cost-food
 							
 							#if (up-can-build gl-with-escrow g: gl-current) (gl-type == 80)
 					
-								up-release-escrow
 								up-build place-normal gl-with-escrow g: gl-current
 						
 								up-chat-data-to-self "Building %s" c: 7031232
@@ -290,7 +293,6 @@ up-setup-cost-data 1 gl-cost-food
 							
 							#if (up-can-build gl-with-escrow g: gl-current) (gl-current == food-dropsite) (or (resource-found food) (game-time > 240)) (gl-built == FALSE)
 					
-								up-release-escrow
 								up-build place-normal gl-with-escrow g: gl-current
 								gl-built = TRUE
 								
@@ -300,7 +302,6 @@ up-setup-cost-data 1 gl-cost-food
 							
 							#if (up-can-build gl-with-escrow g: gl-current) (gl-current == wood-dropsite) (or (resource-found wood) (game-time > 240)) (gl-built == FALSE)
 					
-								up-release-escrow
 								up-build place-normal gl-with-escrow g: gl-current
 								gl-built = TRUE
 								
@@ -310,7 +311,6 @@ up-setup-cost-data 1 gl-cost-food
 							
 							#if (up-can-build gl-with-escrow g: gl-current) (gl-current == gold-dropsite) (or (resource-found gold) (game-time > 240)) (gl-built == FALSE)
 					
-								up-release-escrow
 								up-build place-normal gl-with-escrow g: gl-current
 								gl-built = TRUE
 								
@@ -320,7 +320,6 @@ up-setup-cost-data 1 gl-cost-food
 							
 							#if (up-can-build gl-with-escrow g: gl-current) (gl-current == stone-dropsite) (or (resource-found stone) (game-time > 240)) (gl-built == FALSE)
 					
-								up-release-escrow
 								up-build place-normal gl-with-escrow g: gl-current
 								gl-built = TRUE
 								
@@ -332,7 +331,6 @@ up-setup-cost-data 1 gl-cost-food
 					
 						#if up-can-train gl-with-escrow g: gl-current
 					
-							up-release-escrow
 							up-train gl-with-escrow g: gl-current
 						
 							up-chat-data-to-self "Training %s" c: 7031232
@@ -436,11 +434,23 @@ gl-cost-stone max= 500
 
 ;region Eco
 
-sn-min-food-gatherer = 7
+sn-min-food-gatherer = foodies-per-tc
+sn-min-wood-gatherer = woodies-per-tc
+sn-min-gold-gatherer = goldies-per-tc
+sn-min-stone-gatherer = stonies-per-tc
+
+var gl-tcs
+up-get-fact building-type-count villager-production-building gl-tcs
+gl-tcs max= 1
+
+sn-min-food-gatherer *= gl-tcs
+sn-min-wood-gatherer *= gl-tcs
+sn-min-gold-gatherer *= gl-tcs
+sn-min-stone-gatherer *= gl-tcs
 
 #if civilian-population > 15
 
-	sn-min-wood-gatherer = 8
+	sn-min-wood-gatherer max= 8
 	
 #end-if
 
@@ -496,10 +506,9 @@ sn-stone-gatherer-percentage = gl-stone
 	
 #end-if
 
-#if (building-type-count-total villager-production-building < 2) (can-build-with-escrow villager-production-building)
+#if (building-type-count villager-production-building < 2) (can-build-with-escrow villager-production-building)
 
-	up-release-escrow
-	build villager-production-building
+	up-build place-normal gl-with-escrow c: villager-production-building
 	chat-local-to-self "getting tc"
 	
 #end-if
@@ -642,3 +651,8 @@ gl-pop-cap -= 10
 #end-if
 ;endregion
 
+#if (building-type-count-total villager-production-building == 0)
+
+	sn-maximum-town-size max= 255
+	
+#end-if
