@@ -23,7 +23,8 @@ namespace Compiler.Mods
         public readonly Technology TechInitiated;
         public Resource ResourceGathered => GetResourceGathered();
 
-        public Unit BuildLocation { get; internal set; } = null;
+        public Unit TrainLocation { get; internal set; } = null;
+        public readonly TimeSpan TrainTime;
         public HashSet<Unit> UpgradedFrom { get; internal set; } = new HashSet<Unit>();
         public HashSet<Unit> UpgradesTo { get; internal set; } = new HashSet<Unit>();
         public Unit BaseUnit => UpgradedFrom.FirstOrDefault(u => u.UpgradedFrom.Count == 0) ?? this;
@@ -53,6 +54,7 @@ namespace Compiler.Mods
             Name = new string(Encoding.ASCII.GetChars(unit.Name).Where(c => char.IsLetterOrDigit(c)).ToArray());
             Type = unit.Type;
             Class = (UnitClass)unit.UnitClass;
+            TrainTime = TimeSpan.FromSeconds(unit.TrainTime);
 
             BaseHitpoints = unit.HitPoints;
             BaseRange = Math.Max(1, (int)unit.MaxRange);

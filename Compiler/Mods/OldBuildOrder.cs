@@ -137,7 +137,7 @@ namespace Compiler.Mods
             SearchingTechs = new HashSet<Technology>();
             KnownUnits = new Dictionary<Unit, List<OldBuildElement>>();
             KnownTechnologies = new Dictionary<Technology, List<OldBuildElement>>();
-            AvailableUnits = Civilization.AvailableUnits.Where(u => u.Land).ToList();
+            AvailableUnits = Civilization.KnownUnits.Where(u => u.Land).ToList();
 
             var bo = GetUnit(unit);
             if (bo == null)
@@ -403,9 +403,9 @@ namespace Compiler.Mods
                     {
                         ccost *= 20;
                         
-                        if (Unit.BuildLocation != null)
+                        if (Unit.TrainLocation != null)
                         {
-                            ccost += Unit.BuildLocation.GetCost(Civilization) * 3;
+                            ccost += Unit.TrainLocation.GetCost(Civilization) * 3;
                         }
                     }
 
@@ -550,9 +550,9 @@ namespace Compiler.Mods
             var bo = new List<OldBuildElement>();
 
             // train site
-            if (unit.BuildLocation != null)
+            if (unit.TrainLocation != null)
             {
-                var b = GetUnit(unit.BuildLocation);
+                var b = GetUnit(unit.TrainLocation);
                 if (b == null)
                 {
                     if (unit.Id == TRACK)
@@ -847,7 +847,7 @@ namespace Compiler.Mods
                 prior = 120;
             }
 
-            if (be.Research == false && be.Unit == Unit.BuildLocation)
+            if (be.Research == false && be.Unit == Unit.TrainLocation)
             {
                 prior = 150;
             }

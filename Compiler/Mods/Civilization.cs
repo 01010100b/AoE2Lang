@@ -22,8 +22,9 @@ namespace Compiler.Mods
         public Technology Age2Tech => Technologies.Single(t => t.Id == (int)Resources[Resource.Age2Tech]);
         public Technology Age3Tech => Technologies.Single(t => t.Id == (int)Resources[Resource.Age3Tech]);
         public Technology Age4Tech => Technologies.Single(t => t.Id == (int)Resources[Resource.Age4Tech]);
-        public List<Unit> AvailableUnits => Units.Where(u => u.Available || u.TechRequired).ToList();
-        public List<Unit> TrainableUnits => AvailableUnits.Where(u => u.BuildLocation != null && new OldBuildOrder(this, u).Elements != null).ToList();
+        public List<Unit> KnownUnits => Units.Where(u => u.Available || u.TechRequired).ToList();
+        public List<Unit> BuildableUnits => KnownUnits.Where(u => u.Type == 80 && u.TrainLocation != null && new OldBuildOrder(this, u).Elements != null).ToList();
+        public List<Unit> TrainableUnits => KnownUnits.Where(u => u.Type != 80 && u.TrainLocation != null && new OldBuildOrder(this, u).Elements != null).ToList();
 
         public Civilization(int id, YTY.AocDatLib.Civilization civilization, Mod mod)
         {

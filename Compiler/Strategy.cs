@@ -35,7 +35,7 @@ namespace Compiler
                 .Where(u => u.Land)
                 .Select(u => u.BaseUnit)
                 .Where(u => u.Available || u.TechRequired)
-                .Where(u => u.BuildLocation != null)
+                .Where(u => u.TrainLocation != null)
                 .Where(u => u.Military)
                 .Distinct()
                 .ToList();
@@ -118,6 +118,10 @@ namespace Compiler
                 {
                     BuildOrders.Add(unit, bo);
                 }
+                else
+                {
+                    //Log.Debug($"no bo for {unit.Id} {unit.Name}");
+                }
             }
         }
 
@@ -178,6 +182,37 @@ namespace Compiler
             sb.AppendLine(";region " + Civilization.Name);
 
             sb.AppendLine("#if civ-selected " + Civilization.Id);
+
+            sb.AppendLine("; Builders");
+            var buildings = Civilization.BuildableUnits.Where(u => u.Land && u.Type == 80).Distinct().ToList();
+            buildings.Sort((a, b) => b.TrainTime.CompareTo(a.TrainTime));
+            buildings = buildings.Take(14).ToList();
+
+            sb.AppendLine("(defrule");
+            sb.AppendLine("\t(true)");
+            sb.AppendLine("=>");
+            foreach (var building in buildings.Where(b => b.TrainTime > TimeSpan.FromSeconds(60)))
+            {
+                var vills = 2;
+                if (building.TrainTime > TimeSpan.FromSeconds(120))
+                {
+                    vills = 4;
+                }
+                if (building.TrainTime > TimeSpan.FromSeconds(180))
+                {
+                    vills = 6;
+                }
+                if (building.TrainTime > TimeSpan.FromSeconds(1000))
+                {
+                    vills = 20;
+                }
+
+                sb.AppendLine($"\t(up-assign-builders c: {building.Id} c: {vills})");
+
+                Log.Debug($"Builders for {building.Id} {building.Name} = {vills}");
+            }
+            sb.AppendLine(")");
+            sb.AppendLine("");
 
             // write counters
             sb.AppendLine(";region ---- Counters");

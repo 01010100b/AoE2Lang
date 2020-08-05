@@ -14,7 +14,7 @@ namespace Compiler.Mods
         public readonly List<Technology> Technologies = new List<Technology>();
         public readonly List<Unit> Units = new List<Unit>();
         public readonly List<Civilization> Civilizations = new List<Civilization>();
-        public List<Unit> AvailableUnits => Civilizations.SelectMany(c => c.AvailableUnits).Distinct().ToList();
+        public List<Unit> AvailableUnits => Civilizations.SelectMany(c => c.KnownUnits).Distinct().ToList();
         public List<Unit> TrainableUnits => Civilizations.SelectMany(c => c.TrainableUnits).Distinct().ToList();
 
         public void Load(string file)
@@ -129,9 +129,9 @@ namespace Compiler.Mods
             {
                 var datunit = datunits[unit.Id];
 
-                if (datunit.TrainLocationId > 0 && unit.Type != 80)
+                if (datunit.TrainLocationId > 0)
                 {
-                    unit.BuildLocation = units[datunit.TrainLocationId];
+                    unit.TrainLocation = units[datunit.TrainLocationId];
                 }
 
                 if (datunit.StackUnitId > 0)

@@ -435,11 +435,11 @@ namespace Compiler
             var bo = new List<BuildOrderElement>();
 
             // train site
-            if (unit.BuildLocation != null)
+            if (unit.TrainLocation != null && unit.Type != 80)
             {
-                SolveUnit(unit.BuildLocation);
+                SolveUnit(unit.TrainLocation);
 
-                if (SolvedUnits.TryGetValue(unit.BuildLocation, out List<BuildOrderElement> b))
+                if (SolvedUnits.TryGetValue(unit.TrainLocation, out List<BuildOrderElement> b))
                 {
                     bo.AddRange(b);
                 }
@@ -447,7 +447,7 @@ namespace Compiler
                 {
                     if (unit.Id == TRACK)
                     {
-                        Log.Debug("unit " + TRACK + " train site failed " + unit.BuildLocation.Id);
+                        Log.Debug("unit " + TRACK + " train site failed " + unit.TrainLocation.Id);
                     }
                     SearchedUnits.Remove(unit);
                     return;
@@ -978,7 +978,7 @@ namespace Compiler
                             be.Category = BuildOrderElementCategory.PRIMARY_TRAIN;
                             continue;
                         }
-                        else if (primary.BuildLocation == bbe.Unit)
+                        else if (primary.TrainLocation == bbe.Unit)
                         {
                             be.Category = BuildOrderElementCategory.PRIMARY_TRAINSITE;
                             continue;
@@ -992,7 +992,7 @@ namespace Compiler
                             be.Category = BuildOrderElementCategory.SECONDARY_TRAIN;
                             continue;
                         }
-                        else if (secondary.BuildLocation == bbe.Unit)
+                        else if (secondary.TrainLocation == bbe.Unit)
                         {
                             be.Category = BuildOrderElementCategory.SECONDARY_TRAINSITE;
                             continue;
@@ -1006,7 +1006,7 @@ namespace Compiler
                             be.Category = BuildOrderElementCategory.SIEGE_TRAIN;
                             continue;
                         }
-                        else if (siege.BuildLocation == bbe.Unit)
+                        else if (siege.TrainLocation == bbe.Unit)
                         {
                             be.Category = BuildOrderElementCategory.SIEGE_TRAINSITE;
                             continue;

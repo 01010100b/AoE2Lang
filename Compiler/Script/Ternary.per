@@ -654,5 +654,16 @@ gl-pop-cap -= 10
 #if (building-type-count-total villager-production-building == 0)
 
 	sn-maximum-town-size max= 255
+	sn-camp-max-distance max= 255
+	sn-lumber-camp-max-distance max= 255
+	
+#else
+
+	#if (sn-camp-max-distance >= 250) (sn-lumber-camp-max-distance >= 250)
+	
+		sn-camp-max-distance = 35
+		sn-lumber-camp-max-distance = 20
+		
+	#end-if
 	
 #end-if
