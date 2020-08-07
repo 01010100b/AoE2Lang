@@ -19,7 +19,7 @@
 (defconst food-generating-unit farm)
 (defconst trading-building market)
 (defconst villager-production-building town-center)
-(defconst foodies-per-tc 7)
+(defconst foodies-per-tc 8)
 (defconst woodies-per-tc 4)
 (defconst goldies-per-tc 0)
 (defconst stonies-per-tc 0)
@@ -53,6 +53,7 @@
 #defstrategic sn-percentage-extra-gold = 0; same for gold
 #defstrategic sn-percentage-extra-stone = 0; same for stone
 
+#defstrategic sn-target-army = 0
 #defstrategic sn-target-unit = OFF
 #defstrategic sn-auto-counters = YES
 #defstrategic sn-strategy = OFF
@@ -131,6 +132,14 @@
 var gl-target
 up-find-player enemy find-closest gl-target
 sn-target-player-number = gl-target
+
+#if (timer-triggered ti-repeat-23)
+
+	sn-target-army -= 1
+	sn-target-army max= 0
+	up-chat-data-to-self "Target army: %d" s: sn-target-army
+	
+#end-if
 
 ;endregion
 
@@ -600,9 +609,9 @@ gl-pop-cap -= 10
 
 #if (military-population > 20) (or (up-resource-amount amount-military-population g:>= gl-target-mil) (up-resource-amount amount-population g:>= gl-pop-cap))
 
-	#if sn-maximum-town-size > 500
+	#if sn-maximum-town-size > 250
 	
-		sn-maximum-town-size = 500
+		sn-maximum-town-size = 250
 		sn-number-explore-groups = 10
 		sn-number-attack-groups = 10
 	
@@ -623,19 +632,19 @@ gl-pop-cap -= 10
 	sn-number-explore-groups = 1
 	sn-number-attack-groups = 0
 	
-	#if current-age == feudal-age
+	#if current-age >= feudal-age
 	
 		sn-maximum-town-size = 25
 		
 	#end-if
 	
-	#if current-age == castle-age
+	#if current-age >= castle-age
 	
 		sn-maximum-town-size = 30
 		
 	#end-if
 	
-	#if current-age == imperial-age
+	#if current-age >= imperial-age
 	
 		sn-maximum-town-size = 35
 		
@@ -651,7 +660,7 @@ gl-pop-cap -= 10
 #end-if
 ;endregion
 
-#if (building-type-count-total villager-production-building == 0)
+#if (building-type-count villager-production-building == 0)
 
 	sn-maximum-town-size max= 255
 	sn-camp-max-distance max= 255
@@ -662,7 +671,7 @@ gl-pop-cap -= 10
 	#if (sn-camp-max-distance >= 250) (sn-lumber-camp-max-distance >= 250)
 	
 		sn-camp-max-distance = 35
-		sn-lumber-camp-max-distance = 20
+		sn-lumber-camp-max-distance = 25
 		
 	#end-if
 	

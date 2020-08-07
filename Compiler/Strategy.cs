@@ -17,6 +17,8 @@ namespace Compiler
         public readonly Dictionary<Unit, BuildOrder> BuildOrders = new Dictionary<Unit, BuildOrder>();
         public readonly List<Counter> Counters = new List<Counter>();
 
+        public int BuildOrderAttempts { get; set; } = 100;
+
         public Strategy(Mod mod, Civilization civilization)
         {
             Mod = mod;
@@ -112,7 +114,8 @@ namespace Compiler
                     continue;
                 }
 
-                var bo = bogen.GetBuildOrder(current, null, best_siege, true, true, 100);
+                var bo = bogen.GetBuildOrder(current, null, best_siege, true, true, BuildOrderAttempts);
+                //Log.Debug($"doing {BuildOrderAttempts} attempts");
 
                 if (bo != null && bo.Elements.Count <= 100)
                 {
@@ -209,7 +212,7 @@ namespace Compiler
 
                 sb.AppendLine($"\t(up-assign-builders c: {building.Id} c: {vills})");
 
-                Log.Debug($"Builders for {building.Id} {building.Name} = {vills}");
+                //Log.Debug($"Builders for {building.Id} {building.Name} = {vills}");
             }
             sb.AppendLine(")");
             sb.AppendLine("");

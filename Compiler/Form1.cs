@@ -30,7 +30,15 @@ namespace Compiler
             ButtonCompile.Enabled = false;
             Refresh();
 
-            Compile(true);
+            var attempts = 10;
+            if (CheckFull.Checked)
+            {
+                attempts = 100;
+            }
+
+            //Log.Debug($"requesting {attempts} attempts");
+
+            Compile(true, attempts);
 
             ButtonCompile.Enabled = true;
         }
@@ -40,12 +48,12 @@ namespace Compiler
             ButtonTest.Enabled = false;
             Refresh();
 
-            Compile(false);
+            Compile(false, 10);
 
             ButtonTest.Enabled = true;
         }
 
-        private void Compile(bool parallel)
+        private void Compile(bool parallel, int attempts)
         {
             var settings = new Settings();
 
@@ -63,6 +71,7 @@ namespace Compiler
             sb.AppendLine(";region Auto Counters");
             sb.AppendLine("var gl-target-count = 0");
             sb.AppendLine("var gl-current-count = 0");
+            sb.AppendLine("var gl-total-enemies = 0");
 
             var enemies = mod.Civilizations.SelectMany(c => c.TrainableUnits).Where(u => u.Land && u.Class != UnitClass.Civilian).Distinct().ToList();
 
@@ -72,6 +81,7 @@ namespace Compiler
                 sb.AppendLine($"\t(strategic-number sn-auto-counters == YES)");
                 sb.AppendLine("=>");
                 sb.AppendLine($"\t(up-get-target-fact unit-type-count {unit.Id} gl-current-count)");
+                sb.AppendLine($"\t(up-modify-goal gl-total-enemies g:+ gl-current-count)");
                 sb.AppendLine(")");
 
                 sb.AppendLine("(defrule");
@@ -84,6 +94,8 @@ namespace Compiler
                 sb.AppendLine(")");
             }
 
+            sb.AppendLine("sn-target-army max= gl-total-enemies");
+
             sb.AppendLine(";endregion");
 
             Dictionary<Civilization, Strategy> strategies = new Dictionary<Civilization, Strategy>();
@@ -95,6 +107,7 @@ namespace Compiler
                     Log.Debug($"starting civ {civ.Id} {civ.Name}");
 
                     var strat = new Strategy(mod, civ);
+                    strat.BuildOrderAttempts = attempts;
                     strat.Generate();
 
                     lock (strategies)
@@ -110,6 +123,8 @@ namespace Compiler
                     Log.Debug($"starting civ {civ.Id} {civ.Name}");
 
                     var strat = new Strategy(mod, civ);
+                    strat.BuildOrderAttempts = attempts;
+
                     strat.Generate();
 
                     lock (strategies)

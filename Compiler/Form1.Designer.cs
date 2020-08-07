@@ -31,6 +31,7 @@
             this.ButtonCompile = new System.Windows.Forms.Button();
             this.ButtonTest = new System.Windows.Forms.Button();
             this.ButtonCompilerTest = new System.Windows.Forms.Button();
+            this.CheckFull = new System.Windows.Forms.CheckBox();
             this.SuspendLayout();
             // 
             // ButtonCompile
@@ -63,17 +64,31 @@
             this.ButtonCompilerTest.UseVisualStyleBackColor = true;
             this.ButtonCompilerTest.Click += new System.EventHandler(this.ButtonCompilerTest_Click);
             // 
+            // CheckFull
+            // 
+            this.CheckFull.AutoSize = true;
+            this.CheckFull.Checked = true;
+            this.CheckFull.CheckState = System.Windows.Forms.CheckState.Checked;
+            this.CheckFull.Location = new System.Drawing.Point(93, 120);
+            this.CheckFull.Name = "CheckFull";
+            this.CheckFull.Size = new System.Drawing.Size(81, 17);
+            this.CheckFull.TabIndex = 3;
+            this.CheckFull.Text = "Full (slower)";
+            this.CheckFull.UseVisualStyleBackColor = true;
+            // 
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(800, 450);
+            this.Controls.Add(this.CheckFull);
             this.Controls.Add(this.ButtonCompilerTest);
             this.Controls.Add(this.ButtonTest);
             this.Controls.Add(this.ButtonCompile);
             this.Name = "Form1";
             this.Text = "Form1";
             this.ResumeLayout(false);
+            this.PerformLayout();
 
         }
 
@@ -82,6 +97,7 @@
         private System.Windows.Forms.Button ButtonCompile;
         private System.Windows.Forms.Button ButtonTest;
         private System.Windows.Forms.Button ButtonCompilerTest;
+        private System.Windows.Forms.CheckBox CheckFull;
     }
 }
 
