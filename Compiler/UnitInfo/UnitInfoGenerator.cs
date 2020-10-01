@@ -24,6 +24,8 @@ namespace Compiler.UnitInfo
                 units[unit.Id] = unit;
             }
 
+            GetHashFunction(units.Keys.ToList());
+
             var rules = new List<string>();
 
             var entry_count = units.Keys.Max() + 1;
@@ -67,7 +69,7 @@ namespace Compiler.UnitInfo
 
                     rule =
                         $"(defrule\n" +
-                        $"\t(up-compare-goal gl-unitinfo-unit-id c:== {i})\n" +
+                        $"\t(true)\n" +
                         $"=>\n" +
                         $"\t(set-goal gl-unitinfo-unit-armor1-id {armors[0].Id})\n" +
                         $"\t(set-goal gl-unitinfo-unit-armor1-amount {armors[0].Amount})\n" +
@@ -93,7 +95,7 @@ namespace Compiler.UnitInfo
                 {
                     rule =
                         $"(defrule\n" +
-                        $"\t(up-compare-goal gl-unitinfo-unit-id c:== {i})\n" +
+                        $"\t(true)\n" +
                         $"=>\n" +
                         $"\t(set-goal gl-unitinfo-unit-armor1-id -1)\n" +
                         $"\t(set-goal gl-unitinfo-unit-armor1-amount -1)\n" +
@@ -139,6 +141,66 @@ namespace Compiler.UnitInfo
             Log.Debug($"UnitInfo: {units.Count} units");
 
             return sb.ToString();
+        }
+
+        private Tuple<int, int> GetHashFunction(List<int> ids)
+        {
+            // id + 30k (30k-32k)
+            // id % mod1 2k-10k (0-10k)
+            // id + 20k (20k-30k)
+            // id % mod2 2k-10k (0-10k)
+            // id + 10k (10k-20k)
+            // id % map_length
+
+            var sw = new Stopwatch();
+            sw.Start();
+
+            var map = new int[ids.Count * 4];
+            var rng = new Random();
+            var mod1 = 0;
+            var mod2 = 0;
+
+            var found = false;
+
+            while (!found)
+            {
+                found = true;
+
+                for (int i = 0; i < map.Length; i++)
+                {
+                    map[i] = -1;
+                }
+
+                mod1 = rng.Next(2000, 10000);
+                mod2 = rng.Next(2000, 10000);
+
+                foreach (int id in ids)
+                {
+                    var pos = id;
+                    pos += 30000;
+                    pos %= mod1;
+                    pos += 20000;
+                    pos %= mod2;
+                    pos += 10000;
+                    pos %= map.Length;
+
+                    if (map[pos] != -1)
+                    {
+                        found = false;
+                        break;
+                    }
+                    else
+                    {
+                        map[pos] = id;
+                    }
+                }
+            }
+
+            sw.Stop();
+            Log.Debug($"UnitInfo: Hash search took {sw.Elapsed.TotalSeconds.ToString("N2")} seconds");
+            Log.Debug($"UnitInfo: mod1 {mod1} mod2 {mod2}");
+
+            return new Tuple<int, int>(mod1, mod2);
         }
     }
 }

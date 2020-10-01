@@ -258,6 +258,9 @@ namespace Compiler
 
         private void ButtonUnitInfo_Click(object sender, EventArgs e)
         {
+            ButtonUnitInfo.Enabled = false;
+            Refresh();
+
             var gen = new UnitInfoGenerator();
             var str = gen.Generate(Mod);
 
@@ -265,6 +268,8 @@ namespace Compiler
             File.WriteAllText(file, str);
 
             Process.Start(file);
+
+            ButtonUnitInfo.Enabled = true;
         }
     }
 }
