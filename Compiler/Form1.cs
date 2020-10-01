@@ -1,5 +1,6 @@
 ﻿using Compiler.Lang;
 using Compiler.Mods;
+using Compiler.UnitInfo;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -20,6 +21,8 @@ namespace Compiler
 {
     public partial class Form1 : Form
     {
+        private Mod Mod { get; set; } = null;
+
         public Form1()
         {
             InitializeComponent();
@@ -60,9 +63,6 @@ namespace Compiler
             var sw = new Stopwatch();
             sw.Start();
 
-            var mod = new Mod();
-            mod.Load(settings.DatFile);
-
             var sb = new StringBuilder();
 
             sb.AppendLine(";---- Auto generated ----");
@@ -73,7 +73,7 @@ namespace Compiler
             sb.AppendLine("var gl-current-count = 0");
             sb.AppendLine("var gl-total-enemies = 0");
 
-            var enemies = mod.Civilizations.SelectMany(c => c.TrainableUnits).Where(u => u.Land && u.Class != UnitClass.Civilian).Distinct().ToList();
+            var enemies = Mod.Civilizations.SelectMany(c => c.TrainableUnits).Where(u => u.Land && u.Class != UnitClass.Civilian).Distinct().ToList();
 
             foreach (var unit in enemies.OrderBy(u => u.Id))
             {
@@ -102,11 +102,11 @@ namespace Compiler
 
             if (parallel)
             {
-                Parallel.ForEach(mod.Civilizations.Where(c => c.Id > 0), civ =>
+                Parallel.ForEach(Mod.Civilizations.Where(c => c.Id > 0), civ =>
                 {
                     Log.Debug($"starting civ {civ.Id} {civ.Name}");
 
-                    var strat = new Strategy(mod, civ);
+                    var strat = new Strategy(Mod, civ);
                     strat.BuildOrderAttempts = attempts;
                     strat.Generate();
 
@@ -118,11 +118,11 @@ namespace Compiler
             }
             else
             {
-                foreach (var civ in mod.Civilizations.Where(c => c.Id > 0))
+                foreach (var civ in Mod.Civilizations.Where(c => c.Id > 0))
                 {
                     Log.Debug($"starting civ {civ.Id} {civ.Name}");
 
-                    var strat = new Strategy(mod, civ);
+                    var strat = new Strategy(Mod, civ);
                     strat.BuildOrderAttempts = attempts;
 
                     strat.Generate();
@@ -219,6 +219,52 @@ namespace Compiler
             }
 
             ButtonCompilerTest.Enabled = true;
+        }
+
+        private void ButtonLoad_Click(object sender, EventArgs e)
+        {
+            var diag = new OpenFileDialog();
+            diag.Filter = "aoe2|empires2_x1_p1.dat";
+            diag.ShowDialog();
+
+            if (File.Exists(diag.FileName))
+            {
+                try
+                {
+                    Mod = new Mod();
+                    Mod.Load(diag.FileName);
+                }
+                catch
+                {
+                    Mod = null;
+                }
+
+                if (Mod != null)
+                {
+                    ButtonCompile.Enabled = true;
+                    ButtonTest.Enabled = true;
+                    ButtonCompilerTest.Enabled = true;
+                    ButtonUnitInfo.Enabled = true;
+                }
+                else
+                {
+                    ButtonCompile.Enabled = false;
+                    ButtonTest.Enabled = false;
+                    ButtonCompilerTest.Enabled = false;
+                    ButtonUnitInfo.Enabled = false;
+                }
+            }
+        }
+
+        private void ButtonUnitInfo_Click(object sender, EventArgs e)
+        {
+            var gen = new UnitInfoGenerator();
+            var str = gen.Generate(Mod);
+
+            var file = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "UnitInfo.per");
+            File.WriteAllText(file, str);
+
+            Process.Start(file);
         }
     }
 }

@@ -79,6 +79,7 @@
     <Compile Include="Script.cs" />
     <Compile Include="Settings.cs" />
     <Compile Include="Strategy.cs" />
+    <Compile Include="UnitInfo\UnitInfoGenerator.cs" />
     <EmbeddedResource Include="Form1.resx">
       <DependentUpon>Form1.cs</DependentUpon>
     </EmbeddedResource>
@@ -108,6 +109,11 @@
     <None Include="Script\Ternary.ai" />
     <None Include="Script\Ternary.per" />
     <None Include="Script\Ternary\UserPatchConst.per" />
+    <None Include="UnitInfo\Precompiled\UnitInfoAOC.per" />
+    <None Include="UnitInfo\Precompiled\UnitInfoWK.per" />
+    <None Include="UnitInfo\Prologue.per">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Content Include="def.txt" />

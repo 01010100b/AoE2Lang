@@ -28,6 +28,21 @@ namespace Compiler.Mods
         public HashSet<Unit> UpgradedFrom { get; internal set; } = new HashSet<Unit>();
         public HashSet<Unit> UpgradesTo { get; internal set; } = new HashSet<Unit>();
         public Unit BaseUnit => UpgradedFrom.FirstOrDefault(u => u.UpgradedFrom.Count == 0) ?? this;
+        public List<Unit> Line
+        {
+            get
+            {
+                var line = new List<Unit>();
+                
+                line.AddRange(UpgradedFrom);
+                line.AddRange(UpgradesTo);
+                line.Add(this);
+
+                line.Sort((a, b) => b.UpgradesTo.Count.CompareTo(a.UpgradesTo.Count));
+
+                return line;
+            }
+        }
         public Unit StackUnit { get; internal set; } = null;
         public Unit HeadUnit { get; internal set; } = null;
         public Unit TransformUnit { get; internal set; } = null;
