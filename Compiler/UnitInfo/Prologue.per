@@ -1,7 +1,7 @@
 ﻿; ===== Usage
 
 ; - Load this file at the top of your AI.
-; - Define the goals below.
+; - Define the goals below in the next section.
 ; - Get the info for a specific unit as follows:
 
 ;(defrule
@@ -13,7 +13,7 @@
 ;	(up-jump-direct g: gl-unitinfo-func-addr); and call the lookup function
 ;)
 
-; the goals gl-unitinfo-unit-* (see below) will now have been set and can be read:
+; the goals gl-unitinfo-unit-* will now have been set and can be read:
 
 ;(defrule
 ;	(true)
@@ -21,7 +21,7 @@
 ;	(up-chat-data-to-self "armor 1 id: %d" g: gl-unitinfo-unit-armor1-id) ; should say 15 (archer armor) for a skirm
 ;)
 
-; ===== The following goals need to be defined, they do not need to be defined to any particular value nor do they need to have consecutive values
+; ===== The following goals need to be defined, they do not need to be defined to any particular id nor do they need to have consecutive id's
 
 (defconst gl-unitinfo-func-addr 1)
 (defconst gl-unitinfo-return-addr 2)

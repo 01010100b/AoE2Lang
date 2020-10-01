@@ -19,7 +19,7 @@ namespace Compiler.UnitInfo
         {
             var units = new Dictionary<int, Unit>();
 
-            foreach (var unit in mod.AvailableUnits.Where(u => u.TrainLocation != null))
+            foreach (var unit in mod.TrainableUnits)
             {
                 units[unit.Id] = unit;
             }
@@ -139,6 +139,7 @@ namespace Compiler.UnitInfo
 
             Log.Debug($"UnitInfo: {entry_count} entries");
             Log.Debug($"UnitInfo: {units.Count} units");
+            Log.Debug($"UnitInfo: {rules.Count} rules");
 
             return sb.ToString();
         }
@@ -197,7 +198,7 @@ namespace Compiler.UnitInfo
             }
 
             sw.Stop();
-            Log.Debug($"UnitInfo: Hash search took {sw.Elapsed.TotalSeconds.ToString("N2")} seconds");
+            Log.Debug($"UnitInfo: Hash search took {sw.Elapsed.TotalSeconds:N2} seconds");
             Log.Debug($"UnitInfo: mod1 {mod1} mod2 {mod2}");
 
             return new Tuple<int, int>(mod1, mod2);
