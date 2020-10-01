@@ -12,7 +12,14 @@
 ;	(up-modify-goal gl-unitinfo-return-addr c:+ 1) ; ...to the rule following this one
 ;	(up-jump-direct g: gl-unitinfo-func-addr); and call the lookup function
 ;)
-; the goals gl-unitinfo-unit-* (see below) will now have been set and can be read
+
+; the goals gl-unitinfo-unit-* (see below) will now have been set and can be read:
+
+;(defrule
+;	(true)
+;=>
+;	(up-chat-data-to-self "armor 1 id: %d" g: gl-unitinfo-unit-armor1-id) ; should say 15 (archer armor) for a skirm
+;)
 
 ; ===== The following goals need to be defined, they do not need to be defined to any particular value nor do they need to have consecutive values
 
@@ -34,7 +41,7 @@
 (defconst gl-unitinfo-unit-attack3-amount 15) ; amount of attack 3, or -1
 (defconst gl-unitinfo-unit-upgrade-id 16) ; id of the unit this unit upgrades to, or -1 (not implemented yet)
 (defconst gl-unitinfo-unit-upgrade-research 17) ; id of the research for upgrading this unit, or -1 (not implemented yet)
-(defconst gl-unitinfo-unit-available 18) ; 1 if available, 0 if not or if not a valid unit id (same as the unit-available/building-available facts)
+(defconst gl-unitinfo-unit-available 18) ; 1 if available, 0 if not available or if not a valid unit (same as the unit-available/building-available facts)
 
 (defconst gl-unitinfo-table-addr 19) ; internal use
 (defconst gl-unitinfo-table-offset 20) ; internal use
